@@ -9,10 +9,10 @@ export default function Comments(): JSX.Element {
     <div>
       <Giscus
         id="comments"
-        repo="shpendke/shpendke"
-        repoId="R_kgDOGG_o1w"
+        repo="bbvch/coffeecache"
+        repoId="R_kgDORFJJwQ"
         category="Announcements"
-        categoryId="DIC_kwDOGG_o184Cwru2"
+        categoryId="DIC_kwDORFJJwc4C1qdg"
         mapping="pathname"
         strict="0"
         reactions-enabled="1"
