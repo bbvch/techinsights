@@ -17,7 +17,7 @@ export default function AuthorsList(): React.JSX.Element {
   return (
     <div className="authors-list">
       {Object.values(authorsData).map((author) => (
-        <Author as="h2" author={author} count={1} />
+        <Author as="h2" author={author} />
       ))}
     </div>
   );
