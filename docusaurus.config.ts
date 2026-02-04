@@ -15,15 +15,15 @@ const config: Config = {
   },
 
   // Set the production url of your site here
-  url: 'https://coffeecache.bbv.ch',
+  url: 'https://techinsights.bbv.ch',
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: '/coffeecache/',
+  baseUrl: '/techinsights/',
 
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
   organizationName: 'bbvch', // Usually your GitHub org/user name.
-  projectName: 'coffeecache.github.io', // Usually your repo name.
+  projectName: 'techinsights.github.io', // Usually your repo name.
   trailingSlash: false,
 
   onBrokenLinks: 'throw',
@@ -95,7 +95,7 @@ const config: Config = {
       { name: 'keywords', content: 'azure, blog, cloud, devops, architecture, mct, iac, platform engineering' }
     ],
     navbar: {
-      title: '☕ Coffee Cache by bbv',
+      title: '☕ Tech Insights by bbv',
       items: [
         { href: 'https://bbv.ch/insights/academy/', label: 'Academies', position: 'right' },
         { href: 'https://bbv.ch/career/arbeiten-bei-bbv/', label: 'Join us', position: 'right' },

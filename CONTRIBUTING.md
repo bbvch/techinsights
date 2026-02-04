@@ -18,7 +18,7 @@ What to contribute
 How to submit
 
 1. Fork the repo and create a branch for your post.
-2. Add yourself as an author in `blog/authors.yml` if not already present.
+2. Add yourself as an author in `blog/authors.json` if not already present.
 3. Add a dated folder under `blog/` following the pattern `YYYY-MM-DD-your-slug/`.
    - Place the post in `index.md` (or `index.mdx`) and include frontmatter (title, description, authors, tags, image).
    - Put images in a local `images/` subfolder and reference them relatively (e.g., `./images/cover.png`).
