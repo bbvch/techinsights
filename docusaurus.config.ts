@@ -95,7 +95,7 @@ const config: Config = {
       { name: 'keywords', content: 'azure, blog, cloud, devops, architecture, mct, iac, platform engineering' }
     ],
     navbar: {
-      title: '☕ Tech Insights by bbv',
+      title: 'Tech Insights by bbv',
       items: [
         { href: 'https://bbv.ch/insights/academy/', label: 'Academies', position: 'right' },
         { href: 'https://bbv.ch/career/arbeiten-bei-bbv/', label: 'Join us', position: 'right' },
