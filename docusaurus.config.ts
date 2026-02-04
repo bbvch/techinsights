@@ -5,7 +5,7 @@ import type * as Preset from '@docusaurus/preset-classic';
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
 const config: Config = {
-  title: '☕ Coffee Cache',
+  title: 'Tech Insights',
   tagline: 'bbv Tech Blog - Insights for better software',
   favicon: 'img/favicon.ico',
 
