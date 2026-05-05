@@ -1,0 +1,33 @@
+---
+title: "Automating my Window Blinds with Claude Code: An AI-Assisted Engineering Report"
+description: ""
+authors: [davidchristen]
+tags: [AI, AI-assisted development, Shelly, TypeScript, Python, TDD, Claude Code, Opus 4.6]
+image: 
+---
+
+## Notes
+
+### Description Draft
+
+A practical experience report on building a complete home automation system end-to-end with AI assistance, with no prior background in Shelly devices or home automation. The project covers hardware setup with 8x Shelly 2PM Gen3 smart switches, a TypeScript controller deployed to the Shellys via Shelly Forge, and a Python proxy on a Synology DSM that fetches sun radiation data from the MeteoSwiss open data API. Claude Code helped design the architecture, derive the sun position and shading algorithms, generate test cases, and write code snippets. The honest takeaway: AI alone takes too many shortcuts, but when paired with clear guidance, defined patterns, and engineering review, the outcome is genuinely good. Includes what worked, what didn't, and where human judgment made the difference.
+
+### Findings
+
+- AI wanted to take short cuts all the time
+- some fixes introduced new issues
+- circular behavior in problem solving
+- find limitations in specific operating systems (dsm 6 vs 7)
+- compare solution variants
+- find and explain algorithm for geometrical problem
+- bring up new solutions to improve signal condition (hysteresis, modulation)
+- fix implementation issues based on test cases
+- fix runtime issues based on error output
+- feedback to improve code readability/maintainability
+
+
+## Further Reading
+
+* [GitHub / mslavov / shelly-forge](https://github.com/mslavov/shelly-forge)
+* [Shelly Gen 2+ Device API](https://shelly-api-docs.shelly.cloud/gen2)
+* [Shelly Knowledge Base / Shelly 2PM Gen3](https://kb.shelly.cloud/knowledge-base/shelly-2pm-gen3)
