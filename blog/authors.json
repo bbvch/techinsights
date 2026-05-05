@@ -60,6 +60,19 @@
       "github": "quattervals"
     }
   },
+  "davidchristen": {
+    "name": "David Christen",
+    "title": "Software Engineer & Architect",
+    "description": "David Christen is a Professional Software Architect at bbv Software Services AG.",
+    "url": "https://www.linkedin.com/in/david-christen-dev/",
+    "imageURL": "/img/authors/DavidChristen.jpg",
+    "page": true,
+    "image": "",
+    "socials": {
+      "linkedin": "david-christen",
+      "github": "dav1dev"
+    }
+  },
   "sebastianhans": {
     "name": "Sebastian Hans",
     "title": "Senior Software Engineer & Architect",
