@@ -6,28 +6,67 @@ tags: [AI, AI-assisted development, Shelly, TypeScript, Python, TDD, Claude Code
 image: 
 ---
 
-## Notes
+
+
+## Further Reading
+
+* [GitHub / mourner / suncalc](https://github.com/mourner/suncalc)
+* [GitHub / mslavov / shelly-forge](https://github.com/mslavov/shelly-forge)
+* [Shelly Gen 2+ Device API](https://shelly-api-docs.shelly.cloud/gen2)
+* [Shelly Knowledge Base / Shelly 2PM Gen3](https://kb.shelly.cloud/knowledge-base/shelly-2pm-gen3)
+
+
+## Notes (temp)
 
 ### Description Draft
 
 A practical experience report on building a complete home automation system end-to-end with AI assistance, with no prior background in Shelly devices or home automation. The project covers hardware setup with 8x Shelly 2PM Gen3 smart switches, a TypeScript controller deployed to the Shellys via Shelly Forge, and a Python proxy on a Synology DSM that fetches sun radiation data from the MeteoSwiss open data API. Claude Code helped design the architecture, derive the sun position and shading algorithms, generate test cases, and write code snippets. The honest takeaway: AI alone takes too many shortcuts, but when paired with clear guidance, defined patterns, and engineering review, the outcome is genuinely good. Includes what worked, what didn't, and where human judgment made the difference.
 
+### Attempt
+
+1. describe goal: autonomous blinds automation running directly on shelly without hard dependency on cloud
+2. describe attempt: test driven development, maintenance friendly environment for development and deployment
+3. sketch rough architecture
+4. setup solution, design dependencies and generate scaffold
+5. describe detailed requirements, generate test cases against scaffold (specification testing)
+6. generate implementation incl. problem solving
+7. refactor code and fix issues
+8. iterate (5-7)
+9. extend solution with logging in the same way
+
+
+###
+
+solution:
+
+- develop in vs code
+  - shelly automation: using shelly forge, node.js, typescript, vitest
+  - weather service: pure python
+  - log server: pure python
+- web proxy on nas: python script to fetch and parse latest data from meteo swiss, extract required values, write to json file, expose json file with latest values via built in web station
+- udp log receiver: python script to listen, receive, parse log events, write to daily json log files
+- 8 shelly devices running blinds automation logic
+  - type script
+  - sun calculations (sun position, sun in front of window, window overhang)
+  - fetch radiation data from nas via web request (json)
+  - blinds logic (bed time, manual override via swtiches, sun requires coverage or not)
+  - command mapping (open / close / adjust) to shelly commands
+  - logging (status, decision, action)
+
 ### Findings
 
-- AI wanted to take short cuts all the time
+From idea to PoC in two days. MVP in three days total.
+
+- AI wanted to take short cuts all the time (increase cyclomatic complexity of functions, behavior testing instead of input/output testing, introduce heavy dependencies for lightweight issues)
 - some fixes introduced new issues
-- circular behavior in problem solving
+- find limitations of devices (e.g. available RAM) and match to solution variants, bring up new solutions (cannot read open data api directly due to file size increasing later in the day so that not enough ram for parsing -> introduce web proxy -> run simple python parser and expose required data only on NAS)
+- analyse data source and propose what data to use to base decision on, then generate simple parser in python
+- circular behavior in problem solving (limitations in specific ES version, introduced contradicting test cases)
 - find limitations in specific operating systems (dsm 6 vs 7)
 - compare solution variants
 - find and explain algorithm for geometrical problem
 - bring up new solutions to improve signal condition (hysteresis, modulation)
+- find missing edge cases in test cases
 - fix implementation issues based on test cases
 - fix runtime issues based on error output
 - feedback to improve code readability/maintainability
-
-
-## Further Reading
-
-* [GitHub / mslavov / shelly-forge](https://github.com/mslavov/shelly-forge)
-* [Shelly Gen 2+ Device API](https://shelly-api-docs.shelly.cloud/gen2)
-* [Shelly Knowledge Base / Shelly 2PM Gen3](https://kb.shelly.cloud/knowledge-base/shelly-2pm-gen3)
