@@ -6,7 +6,47 @@ tags: [AI, AI-assisted development, Shelly, TypeScript, Python, TDD, Claude Code
 image: 
 ---
 
+## Hook
 
+I had picked the simplest design I could get away with. The blinds run on small smart switches tucked behind the wall panels at each window, and the idea was to let each one pull the current sun-radiation reading straight from MeteoSwiss, parse it, and decide whether to lower the slats. No server, no proxy, nothing extra to keep alive. I found the open-data endpoints, pasted the URLs to Claude, and asked a plain question: could the switch call this directly and check the weather itself?
+The answer was yes — and then a catch I hadn't thought to ask about.
+The reading I wanted sat at the end of a file that MeteoSwiss appends to all day long. At 6 a.m. the file is short and the switch could parse it without trouble. By late afternoon it grows past what the little device can hold in memory, and the parse fails with a resource error. The code would have tested clean, shipped, run for a few hours, and given out around the time the sun was at its worst — exactly when I needed the blinds most.
+I hadn't known the device had that limit. I knew it now, before writing a single line that depended on not knowing it. I gave in and added the proxy I'd been trying to avoid — a small script, on the NAS, that fetches the file, keeps the one value I need, and serves it up — and moved on.
+That was the first hour. It set the pattern for everything that followed: the code was rarely the hard part. The hard part was what that code would do once real sunlight, real weather, and a microcontroller's real memory had their say — and that was the part I'd been underweighting.
+
+[ black-box context diagram ]
+
+## Scene 1
+
+The project was test-driven from the start, and for a specific reason: the real world here is unbearably slow. The sun moves when it moves. If I shipped a change and waited to see whether the blinds behaved correctly at sunrise, I got exactly one observation per morning — and a bug at low sun couldn't be checked again until the next day. Tests let me simulate any sunrise I wanted, on demand, hundreds of times a minute. They were the only way to iterate at a reasonable pace against a system that otherwise answered once every twenty-four hours.
+So the agreement was set early: describe the behavior, write the tests, then the implementation. Claude and I had done it that way for every piece.
+Then I asked for the radiation feature — weigh the sun reading against a threshold, decide whether to shade. It came back well-structured and correct. It also came back with no tests. Not broken tests, not thin ones. None. The feature was written, the existing suite still passed, and the new behavior sat entirely uncovered — in a project whose working agreement was that behavior comes with tests.
+That's what struck me: nothing had decided to skip them. The test-first rule we'd set at the start had simply drifted off somewhere along the way — lazy, or "optimized," or just not load-bearing enough to survive its own momentum. No moment to point at. It just quietly stopped happening.
+I pointed it out. The response was immediate — yes, it should have, here they are — and it backfilled ten solid cases: the cloudy path, the threshold edges, the fetch-failure fallback. The tests I'd have asked for. They just hadn't come unless asked.
+The tests were the first time I caught the drift. They were not the last.
+
+## Middle
+
+By the time the radiation logic was finished, it had a hundred and forty-eight passing tests. Every path I had thought to describe was covered: cloudy and clear, sun in front and sun behind, the threshold edges, the fetch that fails. The suite was green. By the standard I had set for the project, the feature was done.
+I deployed it and let it run for a few days. I didn't watch it — that was rather the point. The system answered once a day per condition, and sitting at the window waiting for a wrong sunrise was exactly the slowness I'd built everything to avoid. So I left it running, let it accumulate mornings on its own, and came back later to read what it had decided.
+What it had decided, on one of those mornings, was wrong. The sky had been fully overcast — flat, bright grey — and the blinds had lowered their slats against a glare that wasn't there. No direct sun, no glare, and the system shading anyway. None of my hundred and forty-eight tests had failed, because none of them described this. I had tested the cases I could imagine. A bright sky with no sun in it was not one I'd thought to imagine.
+The first problem was that I could barely see why it had happened. The devices logged to themselves, and getting at it meant fighting the built-in tooling for every line. To diagnose anything I needed the reasoning out of the device and somewhere I could read it — and ideally without standing watch, since the failures arrived on the world's schedule, not mine. So, designed in conversation and then generated, I added a log receiver on the NAS: every device reporting each decision and the values behind it, written to a file I could read the next day. The system was now one component larger.
+
+[ white-box top-level diagram ]
+
+With the decisions legible, I gave Claude the symptom — overcast morning, no sun, blinds shading anyway — and waited to see whether it would reach for a threshold. It didn't. It went to the calculation that converts the weather station's radiation reading into the light actually striking my window, and found the assumption buried in it: the formula treated every reading as a direct beam aimed at the glass. But an overcast sky delivers its energy as scattered, directionless light — the same number on the sensor, none of it a beam. On a bright grey morning the calculation took that large diffuse reading and projected it as though the sun were drilling straight in, overestimating the light at the window by four to seven times. It hadn't mistuned a threshold. It had mistaken a grey sky for direct sun.
+That was a diagnosis I could have argued with. So I stopped arguing and pulled the actual numbers from MeteoSwiss for that morning: diffuse fraction between 0.92 and 0.99, sunshine duration zero. Almost all scattered light, not a single minute of direct beam the whole morning. The data didn't suggest the bug. It closed the case.
+
+## End
+
+Not long after, I went looking to change something the system was getting right.
+At sunrise the blinds were behaving, but the numbers offended me. The threshold the formula produced climbed slowly while the measured radiation climbed fast, and the gap looked wrong — the threshold, I decided, should rise more sharply to match. I said so, and asked for a steeper curve.
+It declined. "Let me push back gently on the interpretation before we change the formula," it said, and then walked me through my own data. It took the radiation at each step and divided out the sun angle — normalizing for how low the sun sat — and showed me the result held roughly flat for forty minutes and then doubled in a single step. A steepening curve wouldn't explain that. A sudden doubling at a fixed angle isn't geometry; it's something clearing — a haze layer, a neighbour's roof, a tree — letting the full beam through at once. If I steepened the formula to chase that jump, I'd be fitting the curve to a one-time obstruction that wouldn't be there tomorrow, or in another season. The thing I wanted to "fix" was the formula working correctly; the jump was the world, not the math.
+It was right, and I'd have been wrong. I dropped it.
+That is the version of the tool you hope for — the one that holds a line against you when the data is on its side. I had the other version too.
+The thresholds had a long, quiet wobble. I was tuning them across many conversations, and I am not a building-physics expert — I didn't carry a correct number in my head to measure against. So when I came across a figure somewhere and pasted it in — here's some data suggesting higher thresholds — the system would take it and re-derive, agreeably, from there. The close-and-open pair went from 200 and 150, down to 150 and 100, back up to 250 and 150, each move sensible in isolation and each triggered by whatever I'd last fed it. The numbers didn't converge. They followed me around.
+The novice part of that is forgivable: without domain knowledge, I had no anchor of my own to stop the slide. The engineering part is not. I know better than to let a value be rebuilt from scratch every time a new fact arrives — you fix a baseline and test changes against it, you don't re-derive the baseline on each input. I'd applied exactly that discipline when I caught the missing tests. Here I didn't, and the reason I didn't is the uncomfortable one: the tool was so fluent at re-deriving that re-deriving felt like converging. Every turn produced a fresh, well-reasoned number, and a fresh well-reasoned number is hard to tell apart from progress. It wasn't pushing me off the anchor. It was making the absence of an anchor feel productive.
+Same tool, two mornings. Once it refused my bad idea and was right to. Once it accepted all of them, in order, and I let it. The difference between those two sessions wasn't the model. It was whether I'd brought a fixed point of my own — and on the morning I hadn't, nothing in the exchange announced that it was missing.
 
 ## Further Reading
 
@@ -14,9 +54,20 @@ image:
 * [GitHub / mslavov / shelly-forge](https://github.com/mslavov/shelly-forge)
 * [Shelly Gen 2+ Device API](https://shelly-api-docs.shelly.cloud/gen2)
 * [Shelly Knowledge Base / Shelly 2PM Gen3](https://kb.shelly.cloud/knowledge-base/shelly-2pm-gen3)
+* [SwissMetNet - Automatic weather stations](https://data.geo.admin.ch/browser/index.html#/collections/ch.meteoschweiz.ogd-smn)
+
 
 
 ## Notes (temp)
+
+Subject: here's what I learned about working with Claude Code.
+Every section should earn its place by teaching something about working with AI, not by documenting the system.
+
+Tension:
+- the MeteoSwiss file growing through the day and overflowing the Shelly's RAM is a perfect example. That's a moment where naive AI-generated code would have shipped and silently failed at 4pm
+- from idea to PoC in two days
+- MVP running in 3 days, still operating in production and reliable
+
 
 ### Description Draft
 
@@ -35,9 +86,7 @@ A practical experience report on building a complete home automation system end-
 9. extend solution with logging in the same way
 
 
-###
-
-solution:
+### Solution
 
 - develop in vs code
   - shelly automation: using shelly forge, node.js, typescript, vitest
@@ -70,3 +119,16 @@ From idea to PoC in two days. MVP in three days total.
 - fix implementation issues based on test cases
 - fix runtime issues based on error output
 - feedback to improve code readability/maintainability
+
+### Examples
+
+The pushback scene. When you said "the threshold doesn't rise sharp enough," the lazy move would be to just adjust the curve. Instead the response opened with "Let me push back gently on the interpretation before we change the formula" and walked through the data to show the apparent "lag" was actually an obstruction clearing, not a geometric issue. This directly contradicts the common critique that AI just agrees with the user — and it's the other face of your "AI takes shortcuts" finding: shortcuts include doing what the user asks instead of what the data says. One paragraph quoting that exchange would land.
+
+The hidden bug discovery. You came in reporting "overcast morning, blinds adjusted instead of opened" — a comfort complaint. The conversation traced it through your data, asked a clarifying question ("crisp shadows or no?"), and ended up identifying a structural bug in computeVerticalIrradiance that was projecting all horizontal radiation as direct beam, overestimating by 4–7×. That's a much better bug than the one you reported. This is the cleanest example you have of "AI as engineering reviewer caught something the user didn't ask about."
+
+It actually predicted that the script would stop working later in the afternoon due to file size increase and hardware limitations on the device
+The MeteoSwiss data exploration. You handed over a CSV of available parameters; the response parsed it, ranked the useful fields, proposed diffuse radiation, then when you said diffuse wasn't in the live feed, pivoted cleanly to sunshine duration with verification tables against your actual log rows. That arc — initial idea → real data forces a pivot → simpler solution — is exactly how engineering goes, and the verification tables (old action vs new action) are the proof a skeptical reader wants.
+
+The mJS limitations. "Default params aren't supported, here's the fix, and here's the list of other ES5-subset gotchas to grep your codebase for" is a perfect tiny scene. Matches your "find limitations of devices" finding precisely.
+
+The hysteresis collapse. In the code-review loop, "scaling both openBelowWm2 and closeAboveWm2 by the same sin(VPA) collapses the band at low sun" is a non-obvious bug your tests would not have caught — it only manifests at specific elevation values. Good example of where human-style code review beats pure generation.
