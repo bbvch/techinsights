@@ -3,8 +3,8 @@ title: "Rust vs modern C++ 3/3"
 description: "Rust trifft auf modernes C++: Ein fairer Vergleich einiger Sprachfeatures Teil 3 von 3"
 authors:
   - oliverwith
-date: 2026-05-10
-tags: [rust, c++]
+date: 2026-07-28
+tags: [Rust, C++]
 image: ./images/cppvsrust.png
 ---
 
@@ -16,10 +16,12 @@ Sarah und Marco treffen sich auf einem Workshop wieder. In der Pause kommt das G
 {/* truncate */}
 ---
 
+_Companion Blog für Entscheider: [Modernes C++ und Rust: Wenn Theorie auf Praxis trifft](https://bbv.ch/insights/blog/modernes-c-und-rust-wenn-theorie-auf-praxis-trifft/)_
+
 ## Enums und Pattern Matching
 
 
-**Marco:** "Wir haben auch Enums! Seit C++11 sogar typsichere `enum class` und nicht mehr einfach die verkleideten integers von C."
+**Marco:** "Wir haben auch Enums! Seit C++11 sogar typsichere `enum class` und nicht mehr einfach die verkleideten Integer von C."
 
 **Sarah:** "Stimmt, die einfachen Enums sind bei uns ziemlich ähnlich."
 
@@ -83,7 +85,7 @@ fn simple_switch() {
 
 **Marco:** "Siehst du? Quasi das Gleiche!"
 
-**Sarah:** "Für einfache Enums, ja. Aber was, wenn die Kommandos Daten mitbringen?"
+**Sarah:** "Für einfache Enums, ja. Und was, wenn die Kommandos Daten mitbringen?"
 
 **Marco:** "Ähm... was!? Daten?! Zeig mal ein Beispiel."
 
@@ -130,7 +132,7 @@ fn match_complex_enums() {
 
 ### Info: Algebraische Datentypen
 
-Rusts Enums sind eigentlich *algebraische Datentypen* oder *Sum Types* aus der funktionalen Programmierung. Jede Variante kann unterschiedliche Daten enthalten, und der Compiler garantiert, dass immer nur eine Variante aktiv ist. Das macht sie mächtiger als klassische Enums denn sie können Zustand und Struktur kombinieren.
+Rusts Enums sind eigentlich *algebraische Datentypen* oder *Sum Types* aus der funktionalen Programmierung. Jede Variante kann unterschiedliche Daten enthalten, und der Compiler garantiert, dass immer nur eine Variante aktiv ist. Das macht sie mächtiger als klassische Enums, denn sie können Zustand und Struktur kombinieren.
 
 ### C++: std::variant und std::visit
 
@@ -183,7 +185,7 @@ void complexSwitch() {
 }
 ```
 
-**Sarah:** "Was ist das denn? Soviel Zeremonie für ein so einfach anzuwendendes Konzept"
+**Sarah:** "Was ist das denn? So viel Zeremonie für ein so einfach anzuwendendes Konzept."
 
 **Marco:** "Okay... ich brauche:
 1. Separate Structs für jede Variante
@@ -193,17 +195,17 @@ void complexSwitch() {
 
 **Sarah:** "Ein Template-Helper nur um Pattern Matching nachzubauen?"
 
-**Marco:** "Ja... das `overloaded` Pattern muss man entweder selbst schreiben oder aus einer Bibliothek holen. Dies ist sogar die [offizielle Monstrosität](https://en.cppreference.com/w/cpp/utility/variant/visit). C++ kann alles, aber... das ist schon ziemlich umständlich."
+**Marco:** "Ja... das `overloaded` Pattern muss man entweder selbst schreiben oder aus einer Bibliothek holen. Dies ist sogar die [offizielle Monstrosität](https://en.cppreference.com/w/cpp/utility/variant/visit) ab C++20. C++ kann alles, aber... das ist schon ziemlich umständlich."
 
-**Sarah:**: "Hast du das in der Praxis schon oft gemacht?"
+**Sarah:** "Hast du das in der Praxis schon oft gemacht?"
 
 **Marco:** "Ja... aber selten. Meistens behelfe ich mir mit etwas anderem. Du?"
 
-**Sarah:**: "Ständig!, Gerade auch um Nachrichten zwischen Tasks oder Threads auszutauschen schicke ich einfach einen Member dieses Typs"
+**Sarah:** "Ständig! Gerade auch, um in einer Queue Nachrichten zwischen Tasks oder Threads auszutauschen schicke ich einfach einen Member des Typs, den meine Queue transportiert."
 
 ### Der Unterschied
 
-**Sarah:** "Bei Rust sind Enums mit Daten *die* Standardlösung. Sobald man sich dran gewöhnt hat, verwende ich Enums überall bei Datenstrukturen, die eine Variant-Semantik haben."
+**Sarah:** "Bei Rust sind Enums mit Daten *die* Standardlösung. Seit ich mich daran gewöhnt hatte, verwende ich Enums überall bei Datenstrukturen, die eine Variant-Semantik haben."
 
 ```rust
 enum Message {
@@ -213,7 +215,7 @@ enum Message {
 }
 ```
 
-**Sarah:** "Und auch die Standardlösungen für Optionale Werte und Fehlerbehandlung machen sich algebraische Datentypen zu Nutzen"
+**Sarah:** "Und auch die Standardlösungen für optionale Werte und Fehlerbehandlung machen sich algebraische Datentypen zunutze"
 
 ```rust
 // Optionale Werte
@@ -229,7 +231,7 @@ enum Result<T, E> {
 }
 ```
 
-**Marco:** "Bei uns ist `std::variant` eher... spezialisiert. Für alltägliche Sachen nutzen wir's kaum."
+**Marco:** "Bei uns ist `std::variant` eher spezialisiert. Für alltägliche Sachen nutzen wir's kaum."
 
 **Sarah:** "Weil die Syntax zu komplex ist?"
 
@@ -237,20 +239,20 @@ enum Result<T, E> {
 
 ### Fazit
 
-Einfache Enums sind in beiden Sprachen ähnlich. Der Unterschied zeigt sich bei **Enums mit Daten**:
+Einfache Enums sind in beiden Sprachen ähnlich. Der Unterschied zeigt sich bei Enums mit Daten:
 
 **Rust:**
 - Algebraische Datentypen eingebaut
 - Pattern Matching extrahiert Daten direkt
-- Standardlösung für viele Probleme (`Option<T>`, `Result<T,E>`)
+- Standardlösung für viele Anwendungen (`Option<T>`, `Result<T,E>`)
 
 **C++:**
 - `std::variant` + `std::visit` seit C++17
 - Braucht Boilerplate (`overloaded` Helper)
-- Komplexe Syntax
+- Komplizierte Syntax
 - Echtes Pattern Matching kommt vielleicht mit C++26
 
-**Der Punkt:** Rust hat algebraische Datentypen von Anfang an als Kernfeature designt. C++ hat mit `std::variant` eine technische Lösung nachgerüstet, aber die Ergonomie fehlt. C++ kann alles... nur manchmal mit erstaunlich viel Template-Magie.
+Rust hat algebraische Datentypen von Anfang an als Kernfeature designt. C++ hat mit `std::variant` eine technische Lösung nachgerüstet, aber die Ergonomie fehlt. C++ kann alles... nur manchmal mit erstaunlich viel Template-Magie.
 
 ### Code Samples zu Enums
 
@@ -361,6 +363,20 @@ fn conversions() {
     }
 }
 ```
+:::info
+`From`/`Into` und `TryFrom`/`TryInto` sind reziprok. Wenn es möglich ist Typ `A` aus Typ `B` herzuleiten,
+
+Normalerweise implementiert man den `From`/`TryFrom`-Trait, damit wird der `Into`/`TryInto`-Trait automatisch auch generiert.
+
+Oben hätten wir deshalb auch schreiben können
+```rust
+...
+ match Polar::try_from(Cartesian::new(0.0, 0.0)) {
+...
+```
+
+Wer es ganz genau wissen will: [Rust by Example - Conversion](https://doc.rust-lang.org/rust-by-example/conversion.html)
+:::
 
 **Marco:** "Bei uns würden wir dafür entweder Exceptions nutzen oder – seit C++23 – `std::expected`. Schau mal:"
 
@@ -390,11 +406,11 @@ void conversions() {
 }
 ```
 
-**Sarah:** "Ah, `std::expected` ist also die C++ Antwort auf `Result`! Aber Exceptions sind bei euch immer noch weit verbreitet, oder?"
+**Sarah:** "Ah, `std::expected` ist also die C++-Antwort auf `Result`! Aber Exceptions sind bei euch immer noch weit verbreitet, oder?"
 
-**Marco:** "Ja, leider. Aber `std::expected` wird hoffentlich immer beliebter. Wie schon erwähnt: In C++26 wird es vielleicht sogar ein richtiges Pattern Matching geben ..."
+**Marco:** "Ja, leider. Aber `std::expected` wird hoffentlich immer beliebter. Wie schon erwähnt: In <nobr>C++26</nobr> wird es vielleicht sogar ein richtiges Pattern Matching geben ..."
 
-**Sarah** "... das aber vermutlich eine haarsträubende Syntax haben wird.
+**Sarah:** "... das aber vermutlich eine haarsträubende Syntax haben wird."
 
 
 
