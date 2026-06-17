@@ -1,6 +1,6 @@
 ---
 title: "Reasonable-looking and wrong"
-description: "Building a home-automation system with AI was fast. Making it survive contact with real weather, real hardware, and real edge cases was the actual work. What I learned about where AI helps and where judgment still has to come from you."
+description: "AI built it fast. The rest was catching where it sounded right but wasn't."
 authors: [davidchristen]
 tags: [AI-Assisted Development, Quality Assurance, Testing]
 image: ./images/cover.jpg
@@ -10,7 +10,11 @@ import CenteredImage from '@site/src/components/Image';
 import ContextDiagram from './images/context.svg';
 import SystemDiagram from './images/system.svg';
 
-I had picked the simplest design I could get away with. The blinds run on small smart switches tucked behind the wall panels at each window, and the idea was to let each one pull the current sun-radiation reading straight from MeteoSwiss, parse it, and decide whether to lower the slats. No server, no proxy, nothing extra to keep alive. I found the open-data endpoints, pasted the URLs to Claude, and asked a plain question: could the switch call this directly and check the weather itself?
+*Building a home-automation system with AI was fast. Making it survive contact with real weather, real hardware, and real edge cases was the actual work. What I learned about where AI helps and where judgment still has to come from you.*
+
+___
+
+I had picked the simplest design I could get away with for the blinds in my apartment: cut the daily glare without me having to lower them by hand. The blinds run on small smart switches tucked behind the wall panels at each window, and the idea was to let each one pull the current sun-radiation reading straight from MeteoSwiss, parse it, and decide whether to lower the slats. No server, no proxy, nothing extra to keep alive. I found the open-data endpoints, pasted the URLs to Claude, and asked a plain question: could the switch call this directly and check the weather itself?
 
 The answer was yes, and then a catch I hadn't thought to ask about.
 
