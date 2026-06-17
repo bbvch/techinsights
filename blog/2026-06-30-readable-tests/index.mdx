@@ -1,0 +1,1235 @@
+---
+title: "Readable tests"
+description: "Do you like reading tests? No? Maybe you haven't seen readable tests yet."
+authors:
+  - sebastianhans
+date: 2026-06-30
+tags: [testing]
+image: ./images/cover.png
+---
+
+# Readable tests
+
+Do you like reading tests? I like reading tests.
+Tests tell you what the developers cared about.
+Good tests also tell you what the software is supposed to do. :grin:
+And very good tests even tell you why.
+In this post, I will show how you can get more out of your tests with a few simple tricks.
+
+{/* truncate */}
+
+We will begin with a rather tangled unit test class and apply each trick in turn
+to arrive at a set of well-structured, readable tests that clearly communicate
+intent.
+While this is a toy example, it is modelled after real tests I encountered in
+customer projects.
+The complete code (including the implementation it tests) can be found in the
+GitHub repository [TODO link to GitHub repository with example code]().
+
+## The example
+Our toy test is written in [Java](https://www.java.com/) and uses
+[JUnit](https://junit.org/) 5 and [AssertJ](https://assertj.github.io/doc/) for
+fluent assertions.
+
+```java
+class BlogPostRankerTest0 {
+  private static final Clock MORNING = Clock.fixed(LocalDateTime.parse("2026-01-01T09:00:00")
+                                                                .atZone(ZoneId.systemDefault())
+                                                                .toInstant(),
+                                                   ZoneId.systemDefault());
+  private static final Clock EVENING = Clock.fixed(LocalDateTime.parse("2026-01-01T19:00:00")
+                                                                .atZone(ZoneId.systemDefault())
+                                                                .toInstant(),
+                                                   ZoneId.systemDefault());
+  private static final List<Label> MUTED_LABELS = List.of(new Label("muted1", NEUTRAL),
+                                                          new Label("muted2", NEUTRAL),
+                                                          new Label("neutral", NEUTRAL));
+
+  private User user;
+  private Preferences preferences;
+  private BlogPostRanker ranker;
+
+  @BeforeEach
+  void setUp() {
+    preferences = new Preferences();
+    preferences.setChronologicalTimeline(false);
+    user = new User();
+    user.setName("Lazy Defaulter");
+    user.setPreferences(preferences);
+    ranker = new BlogPostRanker(MORNING);
+  }
+
+  @Test
+  void rankPosts() {
+    var posts = List.of(POST1, POST2, POST3, POST4, POST5);
+    var interestingLabels = Set.of(new Label("this-is-what-i-want", NEUTRAL),
+                                   new Label("interesting-leisure", LEISURE),
+                                   new Label("interesting-work", WORK));
+    assertThat(posts).hasSize(5);
+
+    var rankedPosts = ranker.rankPosts(posts, user);
+    assertThat(rankedPosts).hasSize(5);
+    assertThat(rankedPosts
+                   .getFirst()
+                   .metaData()
+                   .labels())
+        .map(Label::name)
+        .contains("work");
+    assertThat(new BlogPostRanker(EVENING).rankPosts(posts, user)
+                                          .getFirst()
+                                          .metaData()
+                                          .labels())
+        .map(Label::name)
+        .contains("leisure");
+
+    preferences.setInterests(interestingLabels);
+    rankedPosts = ranker.rankPosts(List.of(POST1, POST2, POST6, POST7, POST8, POST9), user);
+    assertThat(rankedPosts).hasSize(6);
+    assertThat(rankedPosts.stream()
+                          .map(post -> post.metaData().labels())
+                          .flatMap(Set::stream)
+                          .map(Label::name))
+        .containsExactly("interesting-work",
+                         "this-is-what-i-want",
+                         "interesting-leisure",
+                         "boring-work",
+                         "boring-leisure");
+  }
+
+  @Test
+  void rankPosts_muted() {
+    var posts = List.of(POST1, POST3, POST10, POST8, POST11);
+    assertThat(posts).hasSize(5);
+    preferences.setMuted(MUTED_LABELS);
+    preferences.setInterests(Set.of(new Label("neutral", NEUTRAL)));
+    assertThat(ranker.rankPosts(posts, user))
+        .hasSize(3)
+        .allSatisfy(post ->
+                        assertThat(post.metaData().labels())
+                            .map(Label::name)
+                            .doesNotContain("muted1", "muted2"));
+  }
+}
+```
+
+As you can see, this class appears to test a ranking algorithm for blog posts.
+There are labels involved, and obviously something can be muted.
+There also seems to be something time-based going on because we can see the test
+uses two different clocks.
+But I bet you can't really tell from the test code alone what exactly is beeing
+tested. Why, for example, does the expected label list at the end of
+`rankPosts()` look like the way it does?
+The first test case in particular contains a mixture of setup code, ranking
+invocations and assertions that makes it hard to tell what is going on and what
+the intended behavior actually is.[^asserting-what-you-want]
+
+[^asserting-what-you-want]:
+    At least the assertions are written in a way that shows what we really want.
+    Instead of using the labels to check the ranking, the test could have used
+    simple equality assertions on the blog posts like this:
+
+    ```java
+    assertThat(rankedPosts).containsExactly(POST9, POST2, POST8, POST7, POST1, POST6);
+    ```
+
+    This works, but it tells us even less about the purpose of the test.
+
+Another thing that makes it difficult to see what the tests do is that most of
+the input is not even part of the tests. All posts the tests rely on are defined
+in a separate class with test data. Here it is.
+
+```java
+public class TestPosts {
+  public static final Author SOME_AUTHOR = new Author("Some Author",
+      "Born somewhere, Some got into writing after being bitten by a spider.");
+
+  public static final BlogPost POST1 = new BlogPost("Some topic",
+      "This is a generic blog post.",
+      new BlogPostMetaData(Instant.EPOCH,
+          SOME_AUTHOR,
+          Collections.emptySet()));
+  public static final BlogPost POST2 = new BlogPost("Some topic",
+      "This is a generic blog post.",
+      new BlogPostMetaData(Instant.EPOCH,
+          SOME_AUTHOR,
+          Set.of(new Label("this-is-what-i-want", NEUTRAL))));
+  public static final BlogPost POST3 = new BlogPost("Some topic",
+      "This is a generic blog post.",
+      new BlogPostMetaData(Instant.EPOCH,
+          SOME_AUTHOR,
+          Set.of(new Label("neutral", NEUTRAL))));
+  public static final BlogPost POST4 = new BlogPost("Some topic",
+      "This is a generic blog post.",
+      new BlogPostMetaData(Instant.EPOCH,
+          SOME_AUTHOR,
+          Set.of(new Label("leisure", LEISURE))));
+  public static final BlogPost POST5 = new BlogPost("Some topic",
+      "This is a generic blog post.",
+      new BlogPostMetaData(Instant.EPOCH,
+          SOME_AUTHOR,
+          Set.of(new Label("work", WORK))));
+  public static final BlogPost POST6 = new BlogPost("Some topic",
+      "This is a generic blog post.",
+      new BlogPostMetaData(Instant.EPOCH,
+          SOME_AUTHOR,
+          Set.of(new Label("boring-leisure", LEISURE))));
+  public static final BlogPost POST7 = new BlogPost("Some topic",
+      "This is a generic blog post.",
+      new BlogPostMetaData(Instant.EPOCH,
+          SOME_AUTHOR,
+          Set.of(new Label("boring-work", WORK))));
+  public static final BlogPost POST8 = new BlogPost("Some topic",
+      "This is a generic blog post.",
+      new BlogPostMetaData(Instant.EPOCH,
+          SOME_AUTHOR,
+          Set.of(new Label("interesting-leisure", LEISURE))));
+  public static final BlogPost POST9 = new BlogPost("Some topic",
+      "This is a generic blog post.",
+      new BlogPostMetaData(Instant.EPOCH,
+          SOME_AUTHOR,
+          Set.of(new Label("interesting-work", WORK))));
+  public static final BlogPost POST10 = new BlogPost("Some topic",
+      "This is a generic blog post.",
+      new BlogPostMetaData(Instant.EPOCH,
+          SOME_AUTHOR,
+          Set.of(new Label("muted1", NEUTRAL))));
+  public static final BlogPost POST11 = new BlogPost("Some topic",
+      "This is a generic blog post.",
+      new BlogPostMetaData(Instant.EPOCH,
+          SOME_AUTHOR,
+          Set.of(new Label("l5", NEUTRAL), new Label("muted2", NEUTRAL))));
+}
+```
+
+That makes everything a lot clearer, doesn't it? No? Don't worry! We are going
+to improve this test step by step until you can easily see what our
+`BlogPostRanker` it is about, even without looking at its implementation.
+
+The first step is to bring a bit of order into the chaos.
+
+## Trick 1: Arrange, Act, Assert
+The pattern “Arrange, Act, Assert” (AAA)[^given-when-then] is a time-honored way of structuring
+unit tests by breaking them into three phases. The pattern is quite old and
+[much](https://xp123.com/3a-arrange-act-assert/)
+[has](https://blog.ploeh.dk/2013/06/24/a-heuristic-for-formatting-code-according-to-the-aaa-pattern/)
+[been](https://java-design-patterns.com/patterns/arrange-act-assert/)
+[written](https://semaphore.io/blog/aaa-pattern-test-automation)
+[about](https://automationpanda.com/2020/07/07/arrange-act-assert-a-pattern-for-writing-good-tests/)
+[it](https://medium.com/@misha_stills/mastering-the-aaa-pattern-in-unit-testing-arrange-act-and-assert-cc0b97d9dab1),
+so I won't go into details here.
+The phases are:
+- _Arrange_ – set up the preconditions for the test (input data and system state).
+- _Act_ – perform the action to be tested.
+- _Assert_ – check the result (output data and system state).
+
+[^given-when-then]:
+    The pattern is also known under the name
+    [Given, When, Then](https://martinfowler.com/bliki/GivenWhenThen.html).
+
+Our first trick is to look over the tests and identify which parts correspond to
+which phase. We will use comments to label the parts and apply minor refactoring
+if necessary to clearly separate the phases. “Minor“ refactoring means that we
+might split statements that do multiple things at once to separate them, but we
+will not completely rearrange the test code.
+
+When we apply this trick to our example test, the result looks like this.
+
+```java
+class BlogPostRankerTest1 {
+  private static final Clock MORNING = Clock.fixed(LocalDateTime.parse("2026-01-01T09:00:00")
+                                                                .atZone(ZoneId.systemDefault())
+                                                                .toInstant(),
+                                                   ZoneId.systemDefault());
+  private static final Clock EVENING = Clock.fixed(LocalDateTime.parse("2026-01-01T19:00:00")
+                                                                .atZone(ZoneId.systemDefault())
+                                                                .toInstant(),
+                                                   ZoneId.systemDefault());
+  private static final List<Label> MUTED_LABELS = List.of(new Label("muted1", NEUTRAL),
+                                                          new Label("muted2", NEUTRAL),
+                                                          new Label("neutral", NEUTRAL));
+
+  private User user;
+  private Preferences preferences;
+  private BlogPostRanker ranker;
+
+  @BeforeEach
+  void setUp() {
+    preferences = new Preferences();
+    preferences.setChronologicalTimeline(false);
+    user = new User();
+    user.setName("Lazy Defaulter");
+    user.setPreferences(preferences);
+    ranker = new BlogPostRanker(MORNING);
+  }
+
+  @Test
+  void rankPosts() {
+    // Arrange
+    var posts = List.of(POST1, POST2, POST3, POST4, POST5);
+
+    // Act
+    var rankedPosts = ranker.rankPosts(posts, user);
+
+    // Assert
+    assertThat(rankedPosts).hasSize(5);
+    assertThat(rankedPosts
+                   .getFirst()
+                   .metaData()
+                   .labels())
+        .map(Label::name)
+        .contains("work");
+
+    // Arrange
+    var eveningRanker = new BlogPostRanker(EVENING);
+
+    // Act
+    rankedPosts = eveningRanker.rankPosts(posts, user);
+
+    // Assert
+    assertThat(rankedPosts
+                   .getFirst()
+                   .metaData()
+                   .labels())
+        .map(Label::name)
+        .contains("leisure");
+
+    // Arrange
+    posts = List.of(POST1, POST2, POST6, POST7, POST8, POST9);
+    preferences.setInterests(Set.of(new Label("this-is-what-i-want", NEUTRAL),
+                                    new Label("interesting-leisure", LEISURE),
+                                    new Label("interesting-work", WORK)));
+
+    // Act
+    rankedPosts = ranker.rankPosts(posts, user);
+
+    // Assert
+    assertThat(rankedPosts).hasSize(6);
+    assertThat(rankedPosts.stream()
+                          .map(post -> post.metaData().labels())
+                          .flatMap(Set::stream)
+                          .map(Label::name))
+        .containsExactly("interesting-work",
+                         "this-is-what-i-want",
+                         "interesting-leisure",
+                         "boring-work",
+                         "boring-leisure");
+  }
+
+  @Test
+  void rankPosts_muted() {
+    // Arrange
+    var posts = List.of(POST1, POST3, POST10, POST8, POST11);
+    preferences.setMuted(MUTED_LABELS);
+    preferences.setInterests(Set.of(new Label("neutral", NEUTRAL)));
+
+    // Act
+    var rankedPosts = ranker.rankPosts(posts, user);
+
+    // Assert
+    assertThat(rankedPosts)
+        .hasSize(3)
+        .allSatisfy(post ->
+                        assertThat(post.metaData().labels())
+                            .map(Label::name)
+                            .doesNotContain("muted1", "muted2"));
+  }
+}
+```
+
+Note that the first test method contains 3 repetitions of the 3 phases and is
+thus not a pure instance of the AAA pattern.
+If we had wanted to, we could have forced the test into this form by, e.g.,
+giving each post list a different name and initializing all of them at the
+beginning of the test method, but this would have obscured the structure of the
+test instead of highlighting it. The point of this step is to get an overview of
+what the test does, not yet to restructure it.
+
+We did change a few things in the test `rankPosts()`, however:
+- Moved the initialization of the set of interesting labels from the beginning
+  of the method down into the “arrange” phase directly preceding its actual use
+  (and inlined it there because there was no longer a use for the temporary
+  variable).
+- Deleted the first assertion (of the post list size) because we noticed that it
+  did not assert anything about the class under test. We just created the list,
+  of course it has 5 elements. Classes and methods used in the “arrange” and
+  “assert” phases should have their own tests elsewhere. In a test of the
+  `BlogPostRanker` we don't want to test `List.of()`.
+- Split the statement containing `new BlogPostRanker(EVENING)` into
+  initialization (arrange), method invocation (act) and assertion (assert).
+- Split the third invocation of `ranker.rankPosts()` into list initialization
+  (arrange) and the actual method call (act).
+
+In `rankPosts_muted()`, we did similar things. These are minor refactorings that
+enhance understanding of the tests.
+
+With this step, the tests have already become a bit more readable, but they are
+not very good yet. For one thing, we already saw that the first test actually
+tests at least 3 different behaviors.
+This makes it hard to understand, and it reduces the amount of information we
+get in the case of failures. If the first assertion for the first behavior
+fails, how do we know whether the other behaviors are correct? We can't!
+The more we pack into a single test method, the less information we get out of
+our tests. So the next step will be to remedy this.
+
+## Trick 2: Test one thing in each test case
+TODO: explain
+
+```java
+class BlogPostRankerTest2 {
+  private static final Clock MORNING = Clock.fixed(LocalDateTime.parse("2026-01-01T09:00:00")
+          .atZone(ZoneId.systemDefault())
+          .toInstant(),
+      ZoneId.systemDefault());
+  private static final Clock EVENING = Clock.fixed(LocalDateTime.parse("2026-01-01T19:00:00")
+          .atZone(ZoneId.systemDefault())
+          .toInstant(),
+      ZoneId.systemDefault());
+  private static final List<Label> MUTED_LABELS =
+      List.of(new Label("muted1", NEUTRAL), new Label("muted2", NEUTRAL));
+
+  private User user;
+  private Preferences preferences;
+  private BlogPostRanker ranker;
+
+  @BeforeEach
+  void setUp() {
+    preferences = new Preferences();
+    preferences.setChronologicalTimeline(false);
+    user = new User();
+    user.setName("Lazy Defaulter");
+    user.setPreferences(preferences);
+    ranker = new BlogPostRanker(MORNING);
+  }
+
+  @Test
+  void ranking_with_interest() {
+    var posts = List.of(POST1, POST1, POST2);
+    preferences.setInterests(Set.of(new Label("this-is-what-i-want", NEUTRAL)));
+
+    var rankedPosts = ranker.rankPosts(posts, user);
+
+    assertThat(rankedPosts.getFirst()
+        .metaData()
+        .labels()
+        .stream()
+        .map(Label::name)).contains("this-is-what-i-want");
+  }
+
+  @Test
+  void ranking_work() {
+    var posts = List.of(POST3, POST4, POST5);
+
+    var rankedPosts = ranker.rankPosts(posts, user);
+
+    assertThat(rankedPosts
+        .getFirst()
+        .metaData()
+        .labels()
+        .stream()
+        .map(Label::name)).contains("work");
+  }
+
+  @Test
+  void ranking_leisure() {
+    var posts = List.of(POST3, POST4, POST5);
+    ranker = new BlogPostRanker(EVENING);
+
+    var rankedPosts = ranker.rankPosts(posts, user);
+
+    assertThat(rankedPosts
+        .getFirst()
+        .metaData()
+        .labels()
+        .stream()
+        .map(Label::name)).contains("leisure");
+  }
+
+  @Test
+  void ranking_interest_work_leisure() {
+    var posts = List.of(POST6, POST7, POST8, POST9);
+    preferences.setInterests(Set.of(new Label("interesting-leisure", LEISURE),
+        new Label("interesting-work", WORK)));
+
+    var rankedPosts = ranker.rankPosts(posts, user);
+
+    assertThat(rankedPosts.stream()
+        .map(post -> post.metaData().labels())
+        .flatMap(Set::stream)
+        .map(Label::name)).containsExactly("interesting-work",
+        "interesting-leisure",
+        "boring-work",
+        "boring-leisure");
+  }
+
+  @Test
+  void ranking_all_posts() {
+    var posts = List.of(POST1, POST2, POST3, POST4);
+
+    var rankedPosts = ranker.rankPosts(posts, user);
+
+    assertThat(rankedPosts).hasSameSizeAs(posts);
+  }
+
+  @Test
+  void ranking_muted() {
+    var posts = List.of(POST1, POST3, POST10, POST8, POST11);
+    preferences.setMuted(MUTED_LABELS);
+
+    var rankedPosts = ranker.rankPosts(posts, user);
+
+    assertThat(rankedPosts).hasSize(3)
+        .allSatisfy(post -> assertThat(post.metaData()
+            .labels()
+            .stream()
+            .map(Label::name)).doesNotContain("muted1",
+            "muted2"));
+  }
+
+  @Test
+  void ranking_conflicted() {
+    var conflicted = new Label("neutral", NEUTRAL);
+    var posts = List.of(POST3);
+    preferences.setInterests(Set.of(conflicted));
+    preferences.setMuted(List.of(conflicted));
+
+    var rankedPosts = ranker.rankPosts(posts, user);
+
+    assertThat(rankedPosts).hasSize(1);
+  }
+}
+```
+
+TODO: highlight improvements
+TODO: show next problem
+
+## Trick 3: Naming in “X should Y if Z” form
+TODO: explain
+
+```java
+class BlogPostRankerTest3 {
+  private static final Clock MORNING = Clock.fixed(LocalDateTime.parse("2026-01-01T09:00:00")
+          .atZone(ZoneId.systemDefault())
+          .toInstant(),
+      ZoneId.systemDefault());
+  private static final Clock EVENING = Clock.fixed(LocalDateTime.parse("2026-01-01T19:00:00")
+          .atZone(ZoneId.systemDefault())
+          .toInstant(),
+      ZoneId.systemDefault());
+  private static final List<Label> MUTED_LABELS =
+      List.of(new Label("muted1", NEUTRAL), new Label("muted2", NEUTRAL));
+
+  private User user;
+  private Preferences preferences;
+  private BlogPostRanker ranker;
+
+  @BeforeEach
+  void setUp() {
+    preferences = new Preferences();
+    preferences.setChronologicalTimeline(false);
+    user = new User();
+    user.setName("Lazy Defaulter");
+    user.setPreferences(preferences);
+    ranker = new BlogPostRanker(MORNING);
+  }
+
+  @Test
+  void ranking_should_prefer_posts_with_interesting_labels_if_user_has_interests() {
+    var posts = List.of(POST1, POST1, POST2);
+    preferences.setInterests(Set.of(new Label("this-is-what-i-want", NEUTRAL)));
+
+    var rankedPosts = ranker.rankPosts(posts, user);
+
+    assertThat(rankedPosts.getFirst()
+        .metaData()
+        .labels()
+        .stream()
+        .map(Label::name)).contains("this-is-what-i-want");
+  }
+
+  @Test
+  void ranking_should_prefer_posts_with_work_labels_in_the_morning() {
+    var posts = List.of(POST3, POST4, POST5);
+
+    var rankedPosts = ranker.rankPosts(posts, user);
+
+    assertThat(rankedPosts
+        .getFirst()
+        .metaData()
+        .labels()
+        .stream()
+        .map(Label::name)).contains("work");
+  }
+
+  @Test
+  void ranking_should_prefer_posts_with_leisure_labels_in_the_evening() {
+    var posts = List.of(POST3, POST4, POST5);
+    ranker = new BlogPostRanker(EVENING);
+
+    var rankedPosts = ranker.rankPosts(posts, user);
+
+    assertThat(rankedPosts
+        .getFirst()
+        .metaData()
+        .labels()
+        .stream()
+        .map(Label::name)).contains("leisure");
+  }
+
+  @Test
+  void ranking_should_assign_higher_priority_to_user_interests_than_to_timebased_classification_if_user_has_interests() {
+    var posts = List.of(POST6, POST7, POST8, POST9);
+    preferences.setInterests(Set.of(new Label("interesting-leisure", LEISURE),
+        new Label("interesting-work", WORK)));
+
+    var rankedPosts = ranker.rankPosts(posts, user);
+
+    assertThat(rankedPosts.stream()
+        .map(post -> post.metaData().labels())
+        .flatMap(Set::stream)
+        .map(Label::name)).containsExactly("interesting-work",
+        "interesting-leisure",
+        "boring-work",
+        "boring-leisure");
+  }
+
+  @Test
+  void ranking_should_return_all_posts_if_user_has_no_muted_labels() {
+    var posts = List.of(POST1, POST2, POST3, POST4);
+
+    var rankedPosts = ranker.rankPosts(posts, user);
+
+    assertThat(rankedPosts).hasSameSizeAs(posts);
+  }
+
+  @Test
+  void ranking_should_remove_posts_with_muted_labels_if_they_are_not_interesting() {
+    var posts = List.of(POST1, POST3, POST10, POST8, POST11);
+    preferences.setMuted(MUTED_LABELS);
+
+    var rankedPosts = ranker.rankPosts(posts, user);
+
+    assertThat(rankedPosts).hasSize(3)
+        .allSatisfy(post -> assertThat(post.metaData()
+            .labels()
+            .stream()
+            .map(Label::name)).doesNotContain("muted1",
+            "muted2"));
+  }
+
+  @Test
+  void ranking_should_keep_posts_with_muted_labels_if_the_same_label_is_interesting() {
+    var conflicted = new Label("neutral", NEUTRAL);
+    var posts = List.of(POST3);
+    preferences.setInterests(Set.of(conflicted));
+    preferences.setMuted(List.of(conflicted));
+
+    var rankedPosts = ranker.rankPosts(posts, user);
+
+    assertThat(rankedPosts).hasSize(1);
+  }
+}
+```
+
+TODO: highlight improvements
+TODO: show next problem
+
+## Trick 4: All relevant test data in the test case
+TODO: explain
+
+```java
+class BlogPostRankerTest4 {
+  private static final Clock MORNING = Clock.fixed(LocalDateTime.parse("2026-01-01T09:00:00")
+          .atZone(ZoneId.systemDefault())
+          .toInstant(),
+      ZoneId.systemDefault());
+  private static final Clock EVENING = Clock.fixed(LocalDateTime.parse("2026-01-01T19:00:00")
+          .atZone(ZoneId.systemDefault())
+          .toInstant(),
+      ZoneId.systemDefault());
+  public static final Author SOME_AUTHOR = new Author("Some Author",
+      "Born somewhere, Some got into writing after being bitten by a spider.");
+
+  @Test
+  void ranking_should_prefer_posts_with_interesting_labels_if_user_has_interests() {
+    var posts = List.of(
+        new BlogPost("Some topic",
+            "This is a generic blog post.",
+            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Collections.emptySet())),
+        new BlogPost("Some topic",
+            "This is a generic blog post.",
+            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Collections.emptySet())),
+        new BlogPost("Some topic",
+            "This is a generic blog post.",
+            new BlogPostMetaData(Instant.EPOCH,
+                SOME_AUTHOR,
+                Set.of(new Label("this-is-what-i-want", NEUTRAL))))
+    );
+    var preferences = new Preferences();
+    preferences.setChronologicalTimeline(false);
+    preferences.setInterests(Set.of(new Label("this-is-what-i-want", NEUTRAL)));
+    var user = new User();
+    user.setName("Lazy Defaulter");
+    user.setPreferences(preferences);
+    BlogPostRanker ranker = new BlogPostRanker(MORNING);
+
+    var rankedPosts = ranker.rankPosts(posts, user);
+
+    assertThat(rankedPosts.getFirst()
+        .metaData()
+        .labels()
+        .stream()
+        .map(Label::name)).contains("this-is-what-i-want");
+  }
+
+  @Test
+  void ranking_should_prefer_posts_with_work_labels_in_the_morning() {
+    var posts = List.of(
+        new BlogPost("Some topic",
+            "This is a generic blog post.",
+            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Set.of(new Label("neutral", NEUTRAL)))),
+        new BlogPost("Some topic",
+            "This is a generic blog post.",
+            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Set.of(new Label("leisure", LEISURE)))),
+        new BlogPost("Some topic",
+            "This is a generic blog post.",
+            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Set.of(new Label("work", WORK))))
+    );
+    var preferences = new Preferences();
+    preferences.setChronologicalTimeline(false);
+    var user = new User();
+    user.setName("Lazy Defaulter");
+    user.setPreferences(preferences);
+    BlogPostRanker ranker = new BlogPostRanker(MORNING);
+
+    var rankedPosts = ranker.rankPosts(posts, user);
+
+    assertThat(rankedPosts
+        .getFirst()
+        .metaData()
+        .labels()
+        .stream()
+        .map(Label::name)).contains("work");
+  }
+
+  @Test
+  void ranking_should_prefer_posts_with_leisure_labels_in_the_evening() {
+    var posts = List.of(
+        new BlogPost("Some topic",
+            "This is a generic blog post.",
+            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Set.of(new Label("neutral", NEUTRAL)))),
+        new BlogPost("Some topic",
+            "This is a generic blog post.",
+            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Set.of(new Label("leisure", LEISURE)))),
+        new BlogPost("Some topic",
+            "This is a generic blog post.",
+            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Set.of(new Label("work", WORK))))
+    );
+    var preferences = new Preferences();
+    preferences.setChronologicalTimeline(false);
+    var user = new User();
+    user.setName("Lazy Defaulter");
+    user.setPreferences(preferences);
+    BlogPostRanker ranker = new BlogPostRanker(EVENING);
+
+    var rankedPosts = ranker.rankPosts(posts, user);
+
+    assertThat(rankedPosts
+        .getFirst()
+        .metaData()
+        .labels()
+        .stream()
+        .map(Label::name)).contains("leisure");
+  }
+
+  @Test
+  void ranking_should_assign_higher_priority_to_user_interests_than_to_timebased_classification_if_user_has_interests() {
+    var interestingLeisureLabel = new Label("interesting-leisure", LEISURE);
+    var interestingWorkLabel = new Label("interesting-work", WORK);
+    var posts = List.of(
+        new BlogPost("Some topic",
+            "This is a generic blog post.",
+            new BlogPostMetaData(Instant.EPOCH,
+                SOME_AUTHOR,
+                Set.of(new Label("boring-leisure", LEISURE)))),
+        new BlogPost("Some topic",
+            "This is a generic blog post.",
+            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Set.of(new Label("boring-work", WORK)))),
+        new BlogPost("Some topic",
+            "This is a generic blog post.",
+            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Set.of(interestingLeisureLabel))),
+        new BlogPost("Some topic",
+            "This is a generic blog post.",
+            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Set.of(interestingWorkLabel)))
+    );
+    BlogPostRanker ranker = new BlogPostRanker(MORNING);
+
+    var preferences = new Preferences();
+    preferences.setChronologicalTimeline(false);
+    preferences.setInterests(Set.of(interestingLeisureLabel, interestingWorkLabel));
+    var user = new User();
+    user.setName("Lazy Defaulter");
+    user.setPreferences(preferences);
+
+    var rankedPosts = ranker.rankPosts(posts, user);
+
+    assertThat(rankedPosts.stream()
+        .map(post -> post.metaData().labels())
+        .flatMap(Set::stream)
+        .map(Label::name)).containsExactly("interesting-work",
+        "interesting-leisure",
+        "boring-work",
+        "boring-leisure");
+  }
+
+  @Test
+  void ranking_should_return_all_posts_if_user_has_no_muted_labels() {
+    var posts = List.of(
+        new BlogPost("Some topic",
+            "This is a generic blog post.",
+            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Collections.emptySet())),
+        new BlogPost("Some topic",
+            "This is a generic blog post.",
+            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Set.of(new Label("l1", NEUTRAL)))),
+        new BlogPost("Some topic",
+            "This is a generic blog post.",
+            new BlogPostMetaData(Instant.EPOCH,
+                SOME_AUTHOR,
+                Set.of(new Label("l3", NEUTRAL), new Label("l4", NEUTRAL))))
+    );
+    var preferences = new Preferences();
+    preferences.setChronologicalTimeline(false);
+    preferences.setMuted(List.of());
+    var user = new User();
+    user.setName("Lazy Defaulter");
+    user.setPreferences(preferences);
+    BlogPostRanker ranker = new BlogPostRanker(MORNING);
+
+    var rankedPosts = ranker.rankPosts(posts, user);
+
+    assertThat(rankedPosts).hasSameSizeAs(posts);
+  }
+
+  @Test
+  void ranking_should_remove_posts_with_muted_labels_if_they_are_not_interesting() {
+    var muted1 = new Label("muted1", NEUTRAL);
+    var muted2 = new Label("muted2", NEUTRAL);
+    var posts = List.of(
+        new BlogPost("Some topic",
+            "This is a generic blog post.",
+            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Collections.emptySet())),
+        new BlogPost("Some topic",
+            "This is a generic blog post.",
+            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Set.of(new Label("l1", NEUTRAL)))),
+        new BlogPost("Some topic",
+            "This is a generic blog post.",
+            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Set.of(muted1))),
+        new BlogPost("Some topic",
+            "This is a generic blog post.",
+            new BlogPostMetaData(Instant.EPOCH,
+                SOME_AUTHOR,
+                Set.of(new Label("l3", NEUTRAL), new Label("l4", NEUTRAL)))),
+        new BlogPost("Some topic",
+            "This is a generic blog post.",
+            new BlogPostMetaData(Instant.EPOCH,
+                SOME_AUTHOR,
+                Set.of(new Label("l5", NEUTRAL), muted2)))
+    );
+    var preferences = new Preferences();
+    preferences.setChronologicalTimeline(false);
+    preferences.setMuted(List.of(muted1, muted2));
+    var user = new User();
+    user.setName("Lazy Defaulter");
+    user.setPreferences(preferences);
+    BlogPostRanker ranker = new BlogPostRanker(MORNING);
+
+    var rankedPosts = ranker.rankPosts(posts, user);
+
+    assertThat(rankedPosts).hasSize(3)
+        .allSatisfy(post -> assertThat(post.metaData()
+            .labels()
+            .stream()
+            .map(Label::name)).doesNotContain(muted1.name(),
+            muted2.name()));
+  }
+
+  @Test
+  void ranking_should_keep_posts_with_muted_labels_if_the_same_label_is_interesting() {
+    var conflicted = new Label("conflicted", NEUTRAL);
+    var posts = List.of(new BlogPost("Some topic",
+        "This is a generic blog post.",
+        new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Set.of(conflicted))));
+    var preferences = new Preferences();
+    preferences.setChronologicalTimeline(false);
+    preferences.setInterests(Set.of(conflicted));
+    preferences.setMuted(List.of(conflicted));
+    var user = new User();
+    user.setName("Lazy Defaulter");
+    user.setPreferences(preferences);
+    BlogPostRanker ranker = new BlogPostRanker(MORNING);
+
+    var rankedPosts = ranker.rankPosts(posts, user);
+
+    assertThat(rankedPosts).hasSize(1);
+  }
+}
+```
+
+TODO: highlight improvements
+TODO: show next problem
+
+## Trick 5: Factories for test data
+TODO: explain
+
+```java
+class BlogPostRankerTest5 {
+  private static final Clock MORNING = Clock.fixed(LocalDateTime.parse("2026-01-01T09:00:00")
+          .atZone(ZoneId.systemDefault())
+          .toInstant(),
+      ZoneId.systemDefault());
+  private static final Clock EVENING = Clock.fixed(LocalDateTime.parse("2026-01-01T19:00:00")
+          .atZone(ZoneId.systemDefault())
+          .toInstant(),
+      ZoneId.systemDefault());
+
+  @Test
+  void ranking_should_prefer_posts_with_interesting_labels_if_user_has_interests() {
+    var interestingPost = somePost(label("this-is-what-i-want"));
+    var posts = List.of(
+        somePost(),
+        somePost(),
+        interestingPost
+    );
+    var rankedPosts = ranker().rankPosts(posts, userWithInterestIn(label("this-is-what-i-want")));
+
+    assertThat(rankedPosts.getFirst()
+        .metaData()
+        .labels()
+        .stream()
+        .map(Label::name)).contains("this-is-what-i-want");
+  }
+
+  @Test
+  void ranking_should_prefer_posts_with_work_labels_in_the_morning() {
+    var posts = List.of(
+        somePost(label("neutral", NEUTRAL)),
+        somePost(label("leisure", LEISURE)),
+        somePost(label("work", WORK))
+    );
+
+    var rankedPosts = ranker(MORNING).rankPosts(posts, userWithDefaultSettings());
+
+    assertThat(rankedPosts
+        .getFirst()
+        .metaData()
+        .labels()
+        .stream()
+        .map(Label::name)).contains("work");
+  }
+
+  @Test
+  void ranking_should_prefer_posts_with_leisure_labels_in_the_evening() {
+    var posts = List.of(
+        somePost(label("neutral", NEUTRAL)),
+        somePost(label("leisure", LEISURE)),
+        somePost(label("work", WORK))
+    );
+
+    var rankedPosts = ranker(EVENING).rankPosts(posts, userWithDefaultSettings());
+
+    assertThat(rankedPosts
+        .getFirst()
+        .metaData()
+        .labels()
+        .stream()
+        .map(Label::name)).contains("leisure");
+  }
+
+  @Test
+  void ranking_should_assign_higher_priority_to_user_interests_than_to_timebased_classification_if_user_has_interests() {
+    var interestingLeisureLabel = label("interesting-leisure", LEISURE);
+    var interestingWorkLabel = label("interesting-work", WORK);
+    var posts = List.of(
+        somePost(label("boring-leisure", LEISURE)),
+        somePost(label("boring-work", WORK)),
+        somePost(interestingLeisureLabel),
+        somePost(interestingWorkLabel)
+    );
+
+    var rankedPosts = ranker(MORNING).rankPosts(posts,
+        userWithInterestIn(interestingLeisureLabel, interestingWorkLabel));
+
+    assertThat(rankedPosts.stream()
+        .map(post -> post.metaData().labels())
+        .flatMap(Set::stream)
+        .map(Label::name)).containsExactly("interesting-work",
+        "interesting-leisure",
+        "boring-work",
+        "boring-leisure");
+  }
+
+  @Test
+  void ranking_should_return_all_posts_if_user_has_no_muted_labels() {
+    var posts = List.of(
+        somePost(),
+        somePost(label("l1")),
+        somePost(label("l3"), label("l4"))
+    );
+    var user = userWithDefaultSettings();
+    user.getPreferences().setMuted(List.of());
+
+    var rankedPosts = ranker().rankPosts(posts, user);
+
+    assertThat(rankedPosts).hasSameSizeAs(posts);
+  }
+
+  @Test
+  void ranking_should_remove_posts_with_muted_labels_if_they_are_not_interesting() {
+    var muted1 = label("muted1");
+    var muted2 = label("muted2");
+    var posts = List.of(
+        somePost(),
+        somePost(label("l1")),
+        somePost(muted1),
+        somePost(label("l3"), label("l4")),
+        somePost(label("l5"), muted2)
+    );
+    var user = userWithDefaultSettings();
+    user.getPreferences().setMuted(List.of(muted1, muted2));
+
+    var rankedPosts = ranker().rankPosts(posts, user);
+
+    assertThat(rankedPosts).hasSize(3)
+        .allSatisfy(post -> assertThat(post.metaData()
+            .labels()
+            .stream()
+            .map(Label::name)).doesNotContain(muted1.name(),
+            muted2.name()));
+  }
+
+  @Test
+  void ranking_should_keep_posts_with_muted_labels_if_the_same_label_is_interesting() {
+    var conflicted = label("conflicted");
+    var posts = List.of(somePost(conflicted));
+    var user = userWithInterestIn(conflicted);
+    user.getPreferences().setMuted(List.of(conflicted));
+
+    var rankedPosts = ranker().rankPosts(posts, user);
+
+    assertThat(rankedPosts).hasSize(1);
+  }
+
+  private BlogPost somePost(Label... labels) {
+    return new BlogPost("Some topic",
+        "This is a generic blog post.",
+        new BlogPostMetaData(Instant.EPOCH,
+            new Author("Some Author",
+                "Born somewhere, Some got into writing after being bitten by a spider."),
+            Arrays.stream(labels).collect(Collectors.toSet())));
+  }
+
+  private BlogPostRanker ranker() {
+    return ranker(MORNING);
+  }
+
+  private BlogPostRanker ranker(Clock clock) {
+    return new BlogPostRanker(clock);
+  }
+
+  private Label label(String name, Label.Classification classification) {
+    return new Label(name, classification);
+  }
+
+  private Label label(String name) {
+    return new Label(name, NEUTRAL);
+  }
+
+  private User userWithDefaultSettings() {
+    var preferences = new Preferences();
+    preferences.setChronologicalTimeline(false);
+    var user = new User();
+    user.setName("Lazy Defaulter");
+    user.setPreferences(preferences);
+    return user;
+  }
+
+  private User userWithInterestIn(Label... interests) {
+    var user = userWithDefaultSettings();
+    user.getPreferences().setInterests(Arrays.stream(interests).collect(Collectors.toSet()));
+    return user;
+  }
+}
+```
+
+TODO: highlight improvements
+TODO: show next problem
+
+## Trick 6: Custom assertions
+TODO: explain
+
+```java
+class BlogPostRankerTest6 {
+  private static final Clock MORNING = Clock.fixed(LocalDateTime.parse("2026-01-01T09:00:00")
+          .atZone(ZoneId.systemDefault())
+          .toInstant(),
+      ZoneId.systemDefault());
+  private static final Clock EVENING = Clock.fixed(LocalDateTime.parse("2026-01-01T19:00:00")
+          .atZone(ZoneId.systemDefault())
+          .toInstant(),
+      ZoneId.systemDefault());
+
+  @Test
+  void ranking_should_prefer_posts_with_interesting_labels_if_user_has_interests() {
+    var interestingPost = somePost(label("this-is-what-i-want"));
+    var posts = List.of(
+        somePost(),
+        somePost(),
+        interestingPost
+    );
+    var rankedPosts = ranker().rankPosts(posts, userWithInterestIn(label("this-is-what-i-want")));
+
+    assertThat(rankedPosts.getFirst()).hasLabel("this-is-what-i-want");
+  }
+
+  @Test
+  void ranking_should_prefer_posts_with_work_labels_in_the_morning() {
+    var posts = List.of(
+        somePost(label("neutral", NEUTRAL)),
+        somePost(label("leisure", LEISURE)),
+        somePost(label("work", WORK))
+    );
+
+    var rankedPosts = ranker(MORNING).rankPosts(posts, userWithDefaultSettings());
+
+    assertThat(rankedPosts.getFirst()).hasLabel("work");
+  }
+
+  @Test
+  void ranking_should_prefer_posts_with_leisure_labels_in_the_evening() {
+    var posts = List.of(
+        somePost(label("neutral", NEUTRAL)),
+        somePost(label("leisure", LEISURE)),
+        somePost(label("work", WORK))
+    );
+
+    var rankedPosts = ranker(EVENING).rankPosts(posts, userWithDefaultSettings());
+
+    assertThat(rankedPosts.getFirst()).hasLabel("leisure");
+  }
+
+  @Test
+  void ranking_should_assign_higher_priority_to_user_interests_than_to_timebased_classification_if_user_has_interests() {
+    var interestingLeisureLabel = label("interesting-leisure", LEISURE);
+    var interestingWorkLabel = label("interesting-work", WORK);
+    var posts = List.of(
+        somePost(label("boring-leisure", LEISURE)),
+        somePost(label("boring-work", WORK)),
+        somePost(interestingLeisureLabel),
+        somePost(interestingWorkLabel)
+    );
+
+    var rankedPosts = ranker(MORNING).rankPosts(posts,
+        userWithInterestIn(interestingLeisureLabel, interestingWorkLabel));
+
+    assertThat(rankedPosts.stream()
+        .map(post -> post.metaData().labels())
+        .flatMap(Set::stream)
+        .map(Label::name)).containsExactly("interesting-work",
+        "interesting-leisure",
+        "boring-work",
+        "boring-leisure");
+  }
+
+  @Test
+  void ranking_should_return_all_posts_if_user_has_no_muted_labels() {
+    var posts = List.of(
+        somePost(),
+        somePost(label("l1")),
+        somePost(label("l3"), label("l4"))
+    );
+    var user = userWithDefaultSettings();
+    user.getPreferences().setMuted(List.of());
+
+    var rankedPosts = ranker().rankPosts(posts, user);
+
+    assertThat(rankedPosts).hasSameSizeAs(posts);
+  }
+
+  @Test
+  void ranking_should_remove_posts_with_muted_labels_if_they_are_not_interesting() {
+    var muted1 = label("muted1");
+    var muted2 = label("muted2");
+    var posts = List.of(
+        somePost(),
+        somePost(label("l1")),
+        somePost(muted1),
+        somePost(label("l3"), label("l4")),
+        somePost(label("l5"), muted2)
+    );
+    var user = userWithDefaultSettings();
+    user.getPreferences().setMuted(List.of(muted1, muted2));
+
+    var rankedPosts = ranker().rankPosts(posts, user);
+
+    assertThat(rankedPosts).hasSize(3)
+        .allSatisfy(post -> assertThat(post).doesNotHaveLabel(muted1.name())
+            .doesNotHaveLabel(muted2.name()));
+  }
+
+  @Test
+  void ranking_should_keep_posts_with_muted_labels_if_the_same_label_is_interesting() {
+    var conflicted = label("conflicted");
+    var posts = List.of(somePost(conflicted));
+    var user = userWithInterestIn(conflicted);
+    user.getPreferences().setMuted(List.of(conflicted));
+
+    var rankedPosts = ranker().rankPosts(posts, user);
+
+    assertThat(rankedPosts).hasSize(1);
+  }
+
+  private BlogPost somePost(Label... labels) {
+    return new BlogPost("Some topic",
+        "This is a generic blog post.",
+        new BlogPostMetaData(Instant.EPOCH,
+            new Author("Some Author",
+                "Born somewhere, Some got into writing after being bitten by a spider."),
+            Arrays.stream(labels).collect(Collectors.toSet())));
+  }
+
+  private BlogPostRanker ranker() {
+    return ranker(MORNING);
+  }
+
+  private BlogPostRanker ranker(Clock clock) {
+    return new BlogPostRanker(clock);
+  }
+
+  private Label label(String name, Label.Classification classification) {
+    return new Label(name, classification);
+  }
+
+  private Label label(String name) {
+    return new Label(name, NEUTRAL);
+  }
+
+  private User userWithDefaultSettings() {
+    var preferences = new Preferences();
+    preferences.setChronologicalTimeline(false);
+    var user = new User();
+    user.setName("Lazy Defaulter");
+    user.setPreferences(preferences);
+    return user;
+  }
+
+  private User userWithInterestIn(Label... interests) {
+    var user = userWithDefaultSettings();
+    user.getPreferences().setInterests(Arrays.stream(interests).collect(Collectors.toSet()));
+    return user;
+  }
+}
+```
+
+TODO: highlight improvements
+
+## Readable tests
+TODO: Fazit
