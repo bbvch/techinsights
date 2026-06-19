@@ -372,135 +372,166 @@ The more we pack into a single test method, the less information we get out of
 our tests. So the next step will be to remedy this.
 
 ## Trick 2: Test one thing in each test case
-TODO: explain
+To get better signal from failing tests, we are going to split our test methods
+into as many methods as needed to get them down to one behavior each.
+
+The test `rankPosts()` consists of three distinct Arrange/Act/Assert sequences.
+Splitting these is straightforward and yields three test methods. But are we
+done yet? The second AAA sequence only has a single assertion, so we can
+probably leave it as it is. Here is the split out test method.
+I named it `ranking_leisure()` because of the label in the assertion. This is
+not a particularly good name, but the main goal for now is to tease distinct
+tests apart. Naming will come later.
 
 ```java
-class BlogPostRankerTest2 {
-  private static final Clock MORNING = Clock.fixed(LocalDateTime.parse("2026-01-01T09:00:00")
-          .atZone(ZoneId.systemDefault())
-          .toInstant(),
-      ZoneId.systemDefault());
-  private static final Clock EVENING = Clock.fixed(LocalDateTime.parse("2026-01-01T19:00:00")
-          .atZone(ZoneId.systemDefault())
-          .toInstant(),
-      ZoneId.systemDefault());
-  private static final List<Label> MUTED_LABELS =
-      List.of(new Label("muted1", NEUTRAL), new Label("muted2", NEUTRAL));
+@Test
+void ranking_leisure() {
+  var posts = List.of(POST1, POST2, POST3, POST4, POST5);
+  ranker = new BlogPostRanker(EVENING);
 
-  private User user;
-  private Preferences preferences;
-  private BlogPostRanker ranker;
+  var rankedPosts = ranker.rankPosts(posts, user);
 
-  @BeforeEach
-  void setUp() {
-    preferences = new Preferences();
-    preferences.setChronologicalTimeline(false);
-    user = new User();
-    user.setName("Lazy Defaulter");
-    user.setPreferences(preferences);
-    ranker = new BlogPostRanker(MORNING);
-  }
-
-  @Test
-  void ranking_with_interest() {
-    var posts = List.of(POST1, POST1, POST2);
-    preferences.setInterests(Set.of(new Label("this-is-what-i-want", NEUTRAL)));
-
-    var rankedPosts = ranker.rankPosts(posts, user);
-
-    assertThat(rankedPosts.getFirst()
-        .metaData()
-        .labels()
-        .stream()
-        .map(Label::name)).contains("this-is-what-i-want");
-  }
-
-  @Test
-  void ranking_work() {
-    var posts = List.of(POST3, POST4, POST5);
-
-    var rankedPosts = ranker.rankPosts(posts, user);
-
-    assertThat(rankedPosts
-        .getFirst()
-        .metaData()
-        .labels()
-        .stream()
-        .map(Label::name)).contains("work");
-  }
-
-  @Test
-  void ranking_leisure() {
-    var posts = List.of(POST3, POST4, POST5);
-    ranker = new BlogPostRanker(EVENING);
-
-    var rankedPosts = ranker.rankPosts(posts, user);
-
-    assertThat(rankedPosts
-        .getFirst()
-        .metaData()
-        .labels()
-        .stream()
-        .map(Label::name)).contains("leisure");
-  }
-
-  @Test
-  void ranking_interest_work_leisure() {
-    var posts = List.of(POST6, POST7, POST8, POST9);
-    preferences.setInterests(Set.of(new Label("interesting-leisure", LEISURE),
-        new Label("interesting-work", WORK)));
-
-    var rankedPosts = ranker.rankPosts(posts, user);
-
-    assertThat(rankedPosts.stream()
-        .map(post -> post.metaData().labels())
-        .flatMap(Set::stream)
-        .map(Label::name)).containsExactly("interesting-work",
-        "interesting-leisure",
-        "boring-work",
-        "boring-leisure");
-  }
-
-  @Test
-  void ranking_all_posts() {
-    var posts = List.of(POST1, POST2, POST3, POST4);
-
-    var rankedPosts = ranker.rankPosts(posts, user);
-
-    assertThat(rankedPosts).hasSameSizeAs(posts);
-  }
-
-  @Test
-  void ranking_muted() {
-    var posts = List.of(POST1, POST3, POST10, POST8, POST11);
-    preferences.setMuted(MUTED_LABELS);
-
-    var rankedPosts = ranker.rankPosts(posts, user);
-
-    assertThat(rankedPosts).hasSize(3)
-        .allSatisfy(post -> assertThat(post.metaData()
-            .labels()
-            .stream()
-            .map(Label::name)).doesNotContain("muted1",
-            "muted2"));
-  }
-
-  @Test
-  void ranking_conflicted() {
-    var conflicted = new Label("neutral", NEUTRAL);
-    var posts = List.of(POST3);
-    preferences.setInterests(Set.of(conflicted));
-    preferences.setMuted(List.of(conflicted));
-
-    var rankedPosts = ranker.rankPosts(posts, user);
-
-    assertThat(rankedPosts).hasSize(1);
-  }
+  assertThat(rankedPosts
+                 .getFirst()
+                 .metaData()
+                 .labels())
+      .map(Label::name)
+      .contains("leisure");
 }
 ```
 
-TODO: highlight improvements
-TODO: show next problem
+The first AAA sequence looks similar, but has an additional `hasSize` assertion.
+Given that `ranking_leisure()` does not need it, maybe this is a different
+aspect we are testing here? Let's make two tests out of this one.
+
+```java
+@Test
+void ranking_work() {
+  var posts = List.of(POST1, POST2, POST3, POST4, POST5);
+
+  var rankedPosts = ranker.rankPosts(posts, user);
+
+  assertThat(rankedPosts
+                 .getFirst()
+                 .metaData()
+                 .labels())
+      .map(Label::name)
+      .contains("work");
+}
+
+@Test
+void ranking_count_posts() {
+  var posts = List.of(POST1, POST2, POST3, POST4, POST5);
+
+  var rankedPosts = ranker.rankPosts(posts, user);
+
+  assertThat(rankedPosts).hasSize(5);
+}
+```
+
+Again, the names are trivially inferred from the assertions.
+
+So how about the third AAA sequence?
+This one also has two assertions.
+The `hasSize()` assertion basically does the same as the one in
+`ranking_count_posts()`, so we'll skip it.
+Having redundant tests for the same thing hurts maintainability.
+If you are unsure whether deleting an assertion is really OK, you might wait
+until the next step before deciding, but in this case, the resulting test method
+would look so similar to the other one that I'm confident they would really be
+testing the same thing.
+
+The remaining assertion looks quite complex. This “work” and “leisure” stuff is
+similar to what we have above, but now it's combined with user interests.
+Probably it's this combination that is supposed to be tested. But one thing
+sticks out – the label “this-is-what-i-want”, which seems to be related neither
+to work nor to leisure.
+From the assertion, it's obvious that labels that appear in the interests of the
+user are supposed to be ordered before labels that do not.
+This seems to be worth its own test case. Let's try pulling it out.
+
+```java
+@Test
+void ranking_with_interest() {
+  var posts = List.of(POST1, POST2, POST6, POST7, POST8, POST9);
+  preferences.setInterests(Set.of(new Label("this-is-what-i-want", NEUTRAL)));
+
+  var rankedPosts = ranker.rankPosts(posts, user);
+
+  assertThat(rankedPosts.getFirst()
+                        .metaData()
+                        .labels())
+      .map(Label::name)
+      .contains("this-is-what-i-want");
+}
+
+
+@Test
+void ranking_interest_work_leisure() {
+  var posts = List.of(POST1, POST6, POST7, POST8, POST9);
+  preferences.setInterests(Set.of(new Label("interesting-leisure", LEISURE),
+                                  new Label("interesting-work", WORK)));
+
+  var rankedPosts = ranker.rankPosts(posts, user);
+
+  assertThat(rankedPosts.stream()
+                        .map(post -> post.metaData().labels())
+                        .flatMap(Set::stream)
+                        .map(Label::name))
+      .containsExactly("interesting-work",
+                       "interesting-leisure",
+                       "boring-work",
+                       "boring-leisure");
+}
+```
+
+This worked, but we had to remove `POST2` from the input of the work/leisure
+test because its label (“this-is-what-i-want”) interfered with our assertion.
+
+Applying the same kind of reasoning to the test `ranking_muted()` allows us to
+split it into two as well.
+
+```java
+@Test
+void ranking_muted() {
+  var posts = List.of(POST1, POST3, POST10, POST8, POST11);
+  preferences.setMuted(MUTED_LABELS);
+
+  var rankedPosts = ranker.rankPosts(posts, user);
+
+  assertThat(rankedPosts).hasSize(3)
+                         .allSatisfy(post ->
+                                         assertThat(post.metaData().labels())
+                                             .map(Label::name)
+                                             .doesNotContain("muted1", "muted2"));
+}
+
+@Test
+void ranking_conflicted() {
+  var conflicted = new Label("neutral", NEUTRAL);
+  var posts = List.of(POST3);
+  preferences.setInterests(Set.of(conflicted));
+  preferences.setMuted(List.of(conflicted));
+
+  var rankedPosts = ranker.rankPosts(posts, user);
+
+  assertThat(rankedPosts).hasSize(1);
+}
+```
+
+Here, we separated the behavior when dealing with muted labels in the absence
+and in the presence of user interest in the same label.
+
+The end result of all this work is a set of focused single-purpose test cases.
+If one of them fails, you can pinpoint much more accurately which behavior caused it.
+And if we want to change the ranking behavior later, it will be much easier to adapt
+these small test cases than it would be to adapt the larger ones containing a
+mixture of to-be-changed and to-be-preserved behaviors.
+
+But which behaviors are these, exactly?
+If a test fails, how can you tell in which way users are impacted?
+You could say something like, “Ranking conflicted is broken,” but what does that
+actually _mean_?
 
 ## Trick 3: Naming in “X should Y if Z” form
 TODO: explain
