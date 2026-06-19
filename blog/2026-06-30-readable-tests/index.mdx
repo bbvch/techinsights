@@ -400,6 +400,12 @@ void ranking_leisure() {
 }
 ```
 
+The one thing I changed is, I removed the Arrange/Act/Assert comments.
+If all your tests are structured like this, it is usually enough to separate the
+three parts with blank lines. In my opinion, adding section marker comments just
+adds noise unless the test case is really long, and if it is, you should
+probably change that instead of adding comments. YYMV.
+
 The first AAA sequence looks similar, but has an additional `hasSize` assertion.
 Given that `ranking_leisure()` does not need it, maybe this is a different
 aspect we are testing here? Let's make two tests out of this one.
@@ -534,135 +540,149 @@ You could say something like, “Ranking conflicted is broken,” but what does 
 actually _mean_?
 
 ## Trick 3: Naming in “X should Y if Z” form
-TODO: explain
+This is probably the hardest step because it requires you to understand what
+the class under test is actually supposed to do, not just what the code
+currently does. Take the test `ranking_conflicted()`, for example. Here it is
+again:
 
 ```java
-class BlogPostRankerTest3 {
-  private static final Clock MORNING = Clock.fixed(LocalDateTime.parse("2026-01-01T09:00:00")
-          .atZone(ZoneId.systemDefault())
-          .toInstant(),
-      ZoneId.systemDefault());
-  private static final Clock EVENING = Clock.fixed(LocalDateTime.parse("2026-01-01T19:00:00")
-          .atZone(ZoneId.systemDefault())
-          .toInstant(),
-      ZoneId.systemDefault());
-  private static final List<Label> MUTED_LABELS =
-      List.of(new Label("muted1", NEUTRAL), new Label("muted2", NEUTRAL));
+@Test
+void ranking_conflicted() {
+  var conflicted = new Label("neutral", NEUTRAL);
+  var posts = List.of(POST3);
+  preferences.setInterests(Set.of(conflicted));
+  preferences.setMuted(List.of(conflicted));
 
-  private User user;
-  private Preferences preferences;
-  private BlogPostRanker ranker;
+  var rankedPosts = ranker.rankPosts(posts, user);
 
-  @BeforeEach
-  void setUp() {
-    preferences = new Preferences();
-    preferences.setChronologicalTimeline(false);
-    user = new User();
-    user.setName("Lazy Defaulter");
-    user.setPreferences(preferences);
-    ranker = new BlogPostRanker(MORNING);
-  }
-
-  @Test
-  void ranking_should_prefer_posts_with_interesting_labels_if_user_has_interests() {
-    var posts = List.of(POST1, POST1, POST2);
-    preferences.setInterests(Set.of(new Label("this-is-what-i-want", NEUTRAL)));
-
-    var rankedPosts = ranker.rankPosts(posts, user);
-
-    assertThat(rankedPosts.getFirst()
-        .metaData()
-        .labels()
-        .stream()
-        .map(Label::name)).contains("this-is-what-i-want");
-  }
-
-  @Test
-  void ranking_should_prefer_posts_with_work_labels_in_the_morning() {
-    var posts = List.of(POST3, POST4, POST5);
-
-    var rankedPosts = ranker.rankPosts(posts, user);
-
-    assertThat(rankedPosts
-        .getFirst()
-        .metaData()
-        .labels()
-        .stream()
-        .map(Label::name)).contains("work");
-  }
-
-  @Test
-  void ranking_should_prefer_posts_with_leisure_labels_in_the_evening() {
-    var posts = List.of(POST3, POST4, POST5);
-    ranker = new BlogPostRanker(EVENING);
-
-    var rankedPosts = ranker.rankPosts(posts, user);
-
-    assertThat(rankedPosts
-        .getFirst()
-        .metaData()
-        .labels()
-        .stream()
-        .map(Label::name)).contains("leisure");
-  }
-
-  @Test
-  void ranking_should_assign_higher_priority_to_user_interests_than_to_timebased_classification_if_user_has_interests() {
-    var posts = List.of(POST6, POST7, POST8, POST9);
-    preferences.setInterests(Set.of(new Label("interesting-leisure", LEISURE),
-        new Label("interesting-work", WORK)));
-
-    var rankedPosts = ranker.rankPosts(posts, user);
-
-    assertThat(rankedPosts.stream()
-        .map(post -> post.metaData().labels())
-        .flatMap(Set::stream)
-        .map(Label::name)).containsExactly("interesting-work",
-        "interesting-leisure",
-        "boring-work",
-        "boring-leisure");
-  }
-
-  @Test
-  void ranking_should_return_all_posts_if_user_has_no_muted_labels() {
-    var posts = List.of(POST1, POST2, POST3, POST4);
-
-    var rankedPosts = ranker.rankPosts(posts, user);
-
-    assertThat(rankedPosts).hasSameSizeAs(posts);
-  }
-
-  @Test
-  void ranking_should_remove_posts_with_muted_labels_if_they_are_not_interesting() {
-    var posts = List.of(POST1, POST3, POST10, POST8, POST11);
-    preferences.setMuted(MUTED_LABELS);
-
-    var rankedPosts = ranker.rankPosts(posts, user);
-
-    assertThat(rankedPosts).hasSize(3)
-        .allSatisfy(post -> assertThat(post.metaData()
-            .labels()
-            .stream()
-            .map(Label::name)).doesNotContain("muted1",
-            "muted2"));
-  }
-
-  @Test
-  void ranking_should_keep_posts_with_muted_labels_if_the_same_label_is_interesting() {
-    var conflicted = new Label("neutral", NEUTRAL);
-    var posts = List.of(POST3);
-    preferences.setInterests(Set.of(conflicted));
-    preferences.setMuted(List.of(conflicted));
-
-    var rankedPosts = ranker.rankPosts(posts, user);
-
-    assertThat(rankedPosts).hasSize(1);
-  }
+  assertThat(rankedPosts).hasSize(0);
 }
 ```
 
-TODO: highlight improvements
-TODO: show next problem
+Or is it?
+Did you notice I changed the number in the assertion from `1` to `0`?
+If you caught it, good for you! But riddle me this: if the test fails now, where
+is the bug? In the implementation of `BlogPostRanker` or in the test? I've come
+across _a lot_ of bugs in my career, and not all of them were in production
+code. Sometimes, it was the test that was wrong.
+And there's no way to tell unless you know what the intended behavior actually
+is.
+
+This is why good test names are so important.
+The name isn't just a unique identifier for the test.
+Ideally, it communicates the intent.
+There are multiple ways to do this.
+The naming scheme I currently like best is **“`X` should `Y` if `Z`”**,
+where `X` is the name of the acting entity or the functionality that is being
+tested[^naming-functionality], `Y` is the expected behavior, and `Z` is the condition that determines
+the behavior.
+
+[^naming-functionality]:
+    I often see the method name being repeated in the test name.
+    I don't like this convention because it increases maintenance effort if the
+    method is renamed. You either have to rename all test methods accordingly or
+    the names go out of sync. Better to use a business term right from the start.
+
+In the case of `ranking_conflicted()`, a better name would be
+`ranking_should_keep_posts_with_muted_labels_if_the_same_label_is_interesting()`.
+Yes, it's long, but now you can tell which number in the assertion is correct,
+right?[^solution]
+
+[^solution]:
+    It's `1` because the label of the post is contained in both the set of
+    interests and the muted list of the user and the name says it should be
+    kept.
+
+The other test methods could be renamed as follows (underscores replaced with
+whitespace so your browser can wrap the names for better readability).
+
+| Old name | New name |
+|----------|----------|
+| ranking with interest | ranking should prefer posts with interesting labels if user has interests |
+| ranking work | ranking should prefer posts with work labels in the morning |
+| ranking leisure | ranking should prefer posts with leisure labels in the evening |
+| ranking interest work leisure | ranking should assign higher priority to user interests than to timebased classification if user has interests |
+| ranking count posts | ranking should return all posts if user has no muted labels |
+| ranking muted | ranking should remove posts with muted labels if they are not interesting |
+
+A good starting point for coming up with these names is to look at the three
+parts of the AAA sequence. Basically, the Act part goes into `X`, the Assert
+part goes into `Y`, and the Arrange part goes into `Z`, and then you edit it to
+get a readable sentence out of it.
+For example:
+
+```java
+@Test
+void ranking_should_prefer_posts_with_leisure_labels_in_the_evening() {
+  // Arrange
+  var posts = List.of(POST3, POST4, POST5);
+  ranker = new BlogPostRanker(EVENING);            // => in the evening
+
+  // Act
+  var rankedPosts = ranker.rankPosts(posts, user); // => ranking
+
+  // Assert
+  assertThat(rankedPosts
+                 .getFirst()                       // => prefer posts
+                 .metaData()
+                 .labels())                        //    with labels
+      .map(Label::name)
+      .contains("leisure");                        //    leisure
+}
+```
+
+While this is not bad as a starting point, sometimes you have to abstract a bit
+or even add something that is not obvious from the code to arrive at the real intent.
+And sometimes, the test even changes as a result.
+For example:
+
+```java
+  @Test
+  void ranking_should_return_all_posts_if_user_has_no_muted_labels() {
+    // Old: var posts = List.of(POST1, POST2, POST3, POST4, POST5);
+    // POST5 didn't add anything to the test, so we can just as well remove it
+    var posts = List.of(POST1, POST2, POST3, POST4);
+    // Nothing here says “no muted labels”, but this is a critical condition for
+    // the test to make sense, so it should be mentioned in the name.
+
+    var rankedPosts = ranker.rankPosts(posts, user);
+
+    // Old: assertThat(rankedPosts).hasSize(5);
+    // What we really want is the same number of posts as before, so this becomes:
+    assertThat(rankedPosts).hasSameSizeAs(posts);
+  }
+```
+
+If you look at the [full source code of this step](TODO:insert link to repo),
+you can see I adjusted the list of input posts in some other test cases, too,
+to match them to the business intent.
+
+As I wrote at the beginning, this is the hardest step because there is really no
+shortcut to understanding the business intent behind the code you are testing.
+If you are writing new code with new tests, you are lucky. You probably already
+know why you are doing it. So please document the intent in the test names!
+You will make someone's life down the line much easier. And the someone might
+even be you in 2 years.
+
+If you aren't the one who wrote the code, understanding the intent of a poorly
+named test is difficult, and you may need to hunt down the original author (who
+might have forgotten) or someone from the business who can explain it to you.
+But once you have pushed through the pain and given each test a good name, you
+have
+- self-documenting tests that actually _mean_ something,
+- much better diagnosis if something breaks,
+- and a means to check the correctness of the test itself (compare what is being
+  asserted to what the name says).
+
+The tests are much better now, but there is still room for improvement.
+For example, when I wrote above that `POST5` didn't add anything to the test,
+did you ask yourself, “How did he know?”
+Actually, in this case it's simple because the test does not really depend on
+anything in the `BlogPost` objects.
+But other tests do, and you cannot determine the correct behavior by looking at
+the test code alone.
+You also have to look at the actual test data, and most of this currently lives
+outside the tests themselves.
 
 ## Trick 4: All relevant test data in the test case
 TODO: explain
