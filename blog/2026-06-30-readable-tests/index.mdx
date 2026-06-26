@@ -684,36 +684,53 @@ the test code alone.
 You also have to look at the actual test data, and most of this currently lives
 outside the tests themselves.
 
+You may also have noticed that the test data is shared among tests.
+While this is not a problem in every case, it does mean that I cannot simply
+change a single test, e. g., by adding a label to a blog post, without
+considering the impact on all other tests that also use this blog post.
+Depending on the complexity of your test data and the number of tests,
+this can make maintenance a real PITA.
+
 ## Trick 4: All relevant test data in the test case
-TODO: explain
+To overcome these problems, we are going to pull (almost) all test data into the
+test methods by moving their initialization into the Arrange phase of each
+test case. Doing this manually is not much fun. Luckily IntelliJ IDEA supports
+automated refactoring using the “Inline field” operation, which works
+beautifully for our blog post constants. It does not work for the setup we do in
+the `@BeforeEach` method, but that's just a matter of copying and pasting the same
+chunk of code into each test method.
+
+Of course, the tests will become much longer, but don't worry! We'll deal with
+this in the next step.
+For now, the result looks like this:
 
 ```java
 class BlogPostRankerTest4 {
   private static final Clock MORNING = Clock.fixed(LocalDateTime.parse("2026-01-01T09:00:00")
-          .atZone(ZoneId.systemDefault())
-          .toInstant(),
-      ZoneId.systemDefault());
+                                                                .atZone(ZoneId.systemDefault())
+                                                                .toInstant(),
+                                                   ZoneId.systemDefault());
   private static final Clock EVENING = Clock.fixed(LocalDateTime.parse("2026-01-01T19:00:00")
-          .atZone(ZoneId.systemDefault())
-          .toInstant(),
-      ZoneId.systemDefault());
+                                                                .atZone(ZoneId.systemDefault())
+                                                                .toInstant(),
+                                                   ZoneId.systemDefault());
   public static final Author SOME_AUTHOR = new Author("Some Author",
-      "Born somewhere, Some got into writing after being bitten by a spider.");
+                                                      "Born somewhere, Some got into writing after being bitten by a spider.");
 
   @Test
   void ranking_should_prefer_posts_with_interesting_labels_if_user_has_interests() {
     var posts = List.of(
         new BlogPost("Some topic",
-            "This is a generic blog post.",
-            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Collections.emptySet())),
+                     "This is a generic blog post.",
+                     new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Collections.emptySet())),
         new BlogPost("Some topic",
-            "This is a generic blog post.",
-            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Collections.emptySet())),
+                     "This is a generic blog post.",
+                     new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Collections.emptySet())),
         new BlogPost("Some topic",
-            "This is a generic blog post.",
-            new BlogPostMetaData(Instant.EPOCH,
-                SOME_AUTHOR,
-                Set.of(new Label("this-is-what-i-want", NEUTRAL))))
+                     "This is a generic blog post.",
+                     new BlogPostMetaData(Instant.EPOCH,
+                                          SOME_AUTHOR,
+                                          Set.of(new Label("this-is-what-i-want", NEUTRAL))))
     );
     var preferences = new Preferences();
     preferences.setChronologicalTimeline(false);
@@ -726,24 +743,30 @@ class BlogPostRankerTest4 {
     var rankedPosts = ranker.rankPosts(posts, user);
 
     assertThat(rankedPosts.getFirst()
-        .metaData()
-        .labels()
-        .stream()
-        .map(Label::name)).contains("this-is-what-i-want");
+                          .metaData()
+                          .labels())
+        .map(Label::name)
+        .contains("this-is-what-i-want");
   }
 
   @Test
   void ranking_should_prefer_posts_with_work_labels_in_the_morning() {
     var posts = List.of(
         new BlogPost("Some topic",
-            "This is a generic blog post.",
-            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Set.of(new Label("neutral", NEUTRAL)))),
+                     "This is a generic blog post.",
+                     new BlogPostMetaData(Instant.EPOCH,
+                                          SOME_AUTHOR,
+                                          Set.of(new Label("neutral", NEUTRAL)))),
         new BlogPost("Some topic",
-            "This is a generic blog post.",
-            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Set.of(new Label("leisure", LEISURE)))),
+                     "This is a generic blog post.",
+                     new BlogPostMetaData(Instant.EPOCH,
+                                          SOME_AUTHOR,
+                                          Set.of(new Label("leisure", LEISURE)))),
         new BlogPost("Some topic",
-            "This is a generic blog post.",
-            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Set.of(new Label("work", WORK))))
+                     "This is a generic blog post.",
+                     new BlogPostMetaData(Instant.EPOCH,
+                                          SOME_AUTHOR,
+                                          Set.of(new Label("work", WORK))))
     );
     var preferences = new Preferences();
     preferences.setChronologicalTimeline(false);
@@ -755,25 +778,31 @@ class BlogPostRankerTest4 {
     var rankedPosts = ranker.rankPosts(posts, user);
 
     assertThat(rankedPosts
-        .getFirst()
-        .metaData()
-        .labels()
-        .stream()
-        .map(Label::name)).contains("work");
+                   .getFirst()
+                   .metaData()
+                   .labels())
+        .map(Label::name)
+        .contains("work");
   }
 
   @Test
   void ranking_should_prefer_posts_with_leisure_labels_in_the_evening() {
     var posts = List.of(
         new BlogPost("Some topic",
-            "This is a generic blog post.",
-            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Set.of(new Label("neutral", NEUTRAL)))),
+                     "This is a generic blog post.",
+                     new BlogPostMetaData(Instant.EPOCH,
+                                          SOME_AUTHOR,
+                                          Set.of(new Label("neutral", NEUTRAL)))),
         new BlogPost("Some topic",
-            "This is a generic blog post.",
-            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Set.of(new Label("leisure", LEISURE)))),
+                     "This is a generic blog post.",
+                     new BlogPostMetaData(Instant.EPOCH,
+                                          SOME_AUTHOR,
+                                          Set.of(new Label("leisure", LEISURE)))),
         new BlogPost("Some topic",
-            "This is a generic blog post.",
-            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Set.of(new Label("work", WORK))))
+                     "This is a generic blog post.",
+                     new BlogPostMetaData(Instant.EPOCH,
+                                          SOME_AUTHOR,
+                                          Set.of(new Label("work", WORK))))
     );
     var preferences = new Preferences();
     preferences.setChronologicalTimeline(false);
@@ -785,11 +814,11 @@ class BlogPostRankerTest4 {
     var rankedPosts = ranker.rankPosts(posts, user);
 
     assertThat(rankedPosts
-        .getFirst()
-        .metaData()
-        .labels()
-        .stream()
-        .map(Label::name)).contains("leisure");
+                   .getFirst()
+                   .metaData()
+                   .labels())
+        .map(Label::name)
+        .contains("leisure");
   }
 
   @Test
@@ -798,19 +827,23 @@ class BlogPostRankerTest4 {
     var interestingWorkLabel = new Label("interesting-work", WORK);
     var posts = List.of(
         new BlogPost("Some topic",
-            "This is a generic blog post.",
-            new BlogPostMetaData(Instant.EPOCH,
-                SOME_AUTHOR,
-                Set.of(new Label("boring-leisure", LEISURE)))),
+                     "This is a generic blog post.",
+                     new BlogPostMetaData(Instant.EPOCH,
+                                          SOME_AUTHOR,
+                                          Set.of(new Label("boring-leisure", LEISURE)))),
         new BlogPost("Some topic",
-            "This is a generic blog post.",
-            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Set.of(new Label("boring-work", WORK)))),
+                     "This is a generic blog post.",
+                     new BlogPostMetaData(Instant.EPOCH,
+                                          SOME_AUTHOR,
+                                          Set.of(new Label("boring-work", WORK)))),
         new BlogPost("Some topic",
-            "This is a generic blog post.",
-            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Set.of(interestingLeisureLabel))),
+                     "This is a generic blog post.",
+                     new BlogPostMetaData(Instant.EPOCH,
+                                          SOME_AUTHOR,
+                                          Set.of(interestingLeisureLabel))),
         new BlogPost("Some topic",
-            "This is a generic blog post.",
-            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Set.of(interestingWorkLabel)))
+                     "This is a generic blog post.",
+                     new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Set.of(interestingWorkLabel)))
     );
     BlogPostRanker ranker = new BlogPostRanker(MORNING);
 
@@ -824,28 +857,32 @@ class BlogPostRankerTest4 {
     var rankedPosts = ranker.rankPosts(posts, user);
 
     assertThat(rankedPosts.stream()
-        .map(post -> post.metaData().labels())
-        .flatMap(Set::stream)
-        .map(Label::name)).containsExactly("interesting-work",
-        "interesting-leisure",
-        "boring-work",
-        "boring-leisure");
+                          .map(post -> post.metaData().labels())
+                          .flatMap(Set::stream)
+                          .map(Label::name))
+        .containsExactly("interesting-work",
+                         "interesting-leisure",
+                         "boring-work",
+                         "boring-leisure");
   }
 
   @Test
   void ranking_should_return_all_posts_if_user_has_no_muted_labels() {
     var posts = List.of(
         new BlogPost("Some topic",
-            "This is a generic blog post.",
-            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Collections.emptySet())),
+                     "This is a generic blog post.",
+                     new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Collections.emptySet())),
         new BlogPost("Some topic",
-            "This is a generic blog post.",
-            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Set.of(new Label("l1", NEUTRAL)))),
+                     "This is a generic blog post.",
+                     new BlogPostMetaData(Instant.EPOCH,
+                                          SOME_AUTHOR,
+                                          Set.of(new Label("l1", NEUTRAL)))),
         new BlogPost("Some topic",
-            "This is a generic blog post.",
-            new BlogPostMetaData(Instant.EPOCH,
-                SOME_AUTHOR,
-                Set.of(new Label("l3", NEUTRAL), new Label("l4", NEUTRAL))))
+                     "This is a generic blog post.",
+                     new BlogPostMetaData(Instant.EPOCH,
+                                          SOME_AUTHOR,
+                                          Set.of(new Label("l3", NEUTRAL),
+                                                 new Label("l4", NEUTRAL))))
     );
     var preferences = new Preferences();
     preferences.setChronologicalTimeline(false);
@@ -866,24 +903,27 @@ class BlogPostRankerTest4 {
     var muted2 = new Label("muted2", NEUTRAL);
     var posts = List.of(
         new BlogPost("Some topic",
-            "This is a generic blog post.",
-            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Collections.emptySet())),
+                     "This is a generic blog post.",
+                     new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Collections.emptySet())),
         new BlogPost("Some topic",
-            "This is a generic blog post.",
-            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Set.of(new Label("l1", NEUTRAL)))),
+                     "This is a generic blog post.",
+                     new BlogPostMetaData(Instant.EPOCH,
+                                          SOME_AUTHOR,
+                                          Set.of(new Label("l1", NEUTRAL)))),
         new BlogPost("Some topic",
-            "This is a generic blog post.",
-            new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Set.of(muted1))),
+                     "This is a generic blog post.",
+                     new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Set.of(muted1))),
         new BlogPost("Some topic",
-            "This is a generic blog post.",
-            new BlogPostMetaData(Instant.EPOCH,
-                SOME_AUTHOR,
-                Set.of(new Label("l3", NEUTRAL), new Label("l4", NEUTRAL)))),
+                     "This is a generic blog post.",
+                     new BlogPostMetaData(Instant.EPOCH,
+                                          SOME_AUTHOR,
+                                          Set.of(new Label("l3", NEUTRAL),
+                                                 new Label("l4", NEUTRAL)))),
         new BlogPost("Some topic",
-            "This is a generic blog post.",
-            new BlogPostMetaData(Instant.EPOCH,
-                SOME_AUTHOR,
-                Set.of(new Label("l5", NEUTRAL), muted2)))
+                     "This is a generic blog post.",
+                     new BlogPostMetaData(Instant.EPOCH,
+                                          SOME_AUTHOR,
+                                          Set.of(new Label("l5", NEUTRAL), muted2)))
     );
     var preferences = new Preferences();
     preferences.setChronologicalTimeline(false);
@@ -896,19 +936,20 @@ class BlogPostRankerTest4 {
     var rankedPosts = ranker.rankPosts(posts, user);
 
     assertThat(rankedPosts).hasSize(3)
-        .allSatisfy(post -> assertThat(post.metaData()
-            .labels()
-            .stream()
-            .map(Label::name)).doesNotContain(muted1.name(),
-            muted2.name()));
+                           .allSatisfy(post ->
+                                           assertThat(post.metaData().labels())
+                                               .map(Label::name)
+                                               .doesNotContain(muted1.name(), muted2.name()));
   }
 
   @Test
   void ranking_should_keep_posts_with_muted_labels_if_the_same_label_is_interesting() {
     var conflicted = new Label("conflicted", NEUTRAL);
     var posts = List.of(new BlogPost("Some topic",
-        "This is a generic blog post.",
-        new BlogPostMetaData(Instant.EPOCH, SOME_AUTHOR, Set.of(conflicted))));
+                                     "This is a generic blog post.",
+                                     new BlogPostMetaData(Instant.EPOCH,
+                                                          SOME_AUTHOR,
+                                                          Set.of(conflicted))));
     var preferences = new Preferences();
     preferences.setChronologicalTimeline(false);
     preferences.setInterests(Set.of(conflicted));
@@ -925,8 +966,45 @@ class BlogPostRankerTest4 {
 }
 ```
 
-TODO: highlight improvements
-TODO: show next problem
+The `TestPosts` class is no more. 🪦
+
+You'll notice we didn't inline `MORNING`, `EVENING`, and `SOME_AUTHOR`, but we
+moved the latter into the test class. This is because `SOME_AUTHOR` is kind of
+scenery for this test. A blog post needs an author, but it has no bearing on the
+functionality under test and is not changed by the tests in any way.
+Thus, sharing it is not a problem and reduces boilerplate.
+
+The clocks do have bearing on the tests, but since there are only two different
+points in time we care about we can share those and include the important
+part – the choice which one to use – in the test method where the
+`BlogPostRanker` is instantiated.
+
+So what have we accomplished? We have improved locality, which gets us two benefits:
+1. Better insight into what, exactly, a test is doing. Looking at
+   `ranking_should_prefer_posts_with_leisure_labels_in_the_evening()`, we can
+   tell immediately that the test checks labels classified as `LEISURE` not just
+   against labels classified as `WORK`, but also against labels classified as
+   `NEUTRAL`. We couldn't read that from the line
+   ```java
+   var posts = List.of(POST3, POST4, POST5);
+   ```
+   we had before without navigating to each of the referenced `BlogPost` objects.
+   And we can also immediately see that the leisure post is not the first one in
+   the input list. (Otherwise a no-op ranking would pass the test.)
+2. Simplified maintenance. Suppose we want to add another label to the leisure
+   post in the same test. We can just do it without fear of breaking any other
+   test. With shared test data, we would have had to check which other tests used
+   `POST4` and how the change would affect them. If in doubt, we would replace it
+   with a newly added `POST12`. And then our Arrange phase would look like this:
+   ```java
+   var posts = List.of(POST3, POST12, POST5);
+   ```
+   Can you imagine the face of the next developer looking at this and
+   asking themselves, “Why the … is `POST12` in the middle?”
+
+I hope I have convinced you that locality is king in tests, but you might be
+thinking, “But it's so much code!”
+And right you are. That's why we have another trick up our sleeves.
 
 ## Trick 5: Factories for test data
 TODO: explain
@@ -1284,3 +1362,5 @@ TODO: highlight improvements
 
 ## Readable tests
 TODO: Fazit
+New tests: don't start at step 0. start at step 4! then extract factories as the
+need arises
