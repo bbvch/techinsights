@@ -1007,204 +1007,308 @@ thinking, “But it's so much code!”
 And right you are. That's why we have another trick up our sleeves.
 
 ## Trick 5: Factories for test data
-TODO: explain
+In this step, we will introduce factory methods for test data to reduce
+boilerplate code. The factory methods encapsulate the knowledge of how to create
+objects required for the test and thus remove the bloat we introduced in the
+previous step – not unlike using shared data definitions. However, there are two
+important differences between those and the factory methods.
+1. The factory methods let us control those parts of the data that are relevant
+   to the test while hiding everything else.
+2. The factory methods return new objects, which does not matter much in our toy
+   example, but is very important for test isolation if the objects are mutable.
+   Creating new objects for each test ensures each test starts with a known
+   state.
+
+Let's first see what a test using the factory methods looks like:
 
 ```java
-class BlogPostRankerTest5 {
-  private static final Clock MORNING = Clock.fixed(LocalDateTime.parse("2026-01-01T09:00:00")
-          .atZone(ZoneId.systemDefault())
-          .toInstant(),
-      ZoneId.systemDefault());
-  private static final Clock EVENING = Clock.fixed(LocalDateTime.parse("2026-01-01T19:00:00")
-          .atZone(ZoneId.systemDefault())
-          .toInstant(),
-      ZoneId.systemDefault());
+@Test
+void ranking_should_prefer_posts_with_leisure_labels_in_the_evening() {
+  var posts = List.of(
+      somePost(label("neutral", NEUTRAL)),
+      somePost(label("leisure", LEISURE)),
+      somePost(label("work", WORK))
+  );
 
-  @Test
-  void ranking_should_prefer_posts_with_interesting_labels_if_user_has_interests() {
-    var interestingPost = somePost(label("this-is-what-i-want"));
-    var posts = List.of(
-        somePost(),
-        somePost(),
-        interestingPost
-    );
-    var rankedPosts = ranker().rankPosts(posts, userWithInterestIn(label("this-is-what-i-want")));
+  var rankedPosts = ranker(EVENING).rankPosts(posts, userWithDefaultSettings());
 
-    assertThat(rankedPosts.getFirst()
-        .metaData()
-        .labels()
-        .stream()
-        .map(Label::name)).contains("this-is-what-i-want");
+  assertThat(rankedPosts.getFirst()
+                        .metaData()
+                        .labels())
+      .map(Label::name)
+      .contains("leisure");
+}
+```
+
+Much better! The only variance the test cares about is the label classification
+and the time of day. Both are expressed clearly, while hiding irrelevant stuff
+like the other attributes of blog posts and the user preferences.
+As you can see, I relaxed the separation between the Arrange and Act phases
+somewhat by calling the factories for the `BlogPostRanker` and the `User` in the
+same line where the action takes place. I did this because the code is now
+declarative[^declarative-code] and short.
+I didn't inline the list of posts because it is too long for that.
+But that's just my style. You could insist on strict phase separation and assign
+the ranker and the user to variables first. In any case, the resulting test is
+much more readable because it is focused on the essential parts.
+
+[^declarative-code]:
+    Declarative code describes the desired state rather than the way to get there.
+    `new BlogPostRanker(EVENING)` says, “Create a new blog post ranker for the evening.”
+    `ranker(EVENING)` just says, “A ranker for the evening,” and does not care
+    how it is created. The former is an instruction in the form of a whole
+    sentence, the latter is more like a noun phrase that can be inserted into a
+    sentence. Which is exactly what we are doing in this example.
+
+Here is another test:
+
+```java
+@Test
+void ranking_should_prefer_posts_with_interesting_labels_if_user_has_interests() {
+  var interestingPost = somePost(label("this-is-what-i-want"));
+  var posts = List.of(
+      somePost(),
+      somePost(),
+      interestingPost
+  );
+
+  var rankedPosts = ranker().rankPosts(posts, userWithInterestIn(label("this-is-what-i-want")));
+
+  assertThat(rankedPosts.getFirst()
+                        .metaData()
+                        .labels())
+      .map(Label::name)
+      .contains("this-is-what-i-want");
+}
+```
+
+In this one, we don't care about the categorization of the labels or the time of
+day, but we do care about the interests of the user. Therefore we use different variants
+of the factory methods to, again, expose only those characteristics of the test
+objects that matter for this test.
+
+And here are our factory methods:
+
+```java
+private BlogPost somePost(Label... labels) {
+  return new BlogPost("Some topic",
+                      "This is a generic blog post.",
+                      new BlogPostMetaData(Instant.EPOCH,
+                                           new Author("Some Author",
+                                                      "Born somewhere, Some got into writing after being bitten by a spider."),
+                                           Arrays.stream(labels).collect(Collectors.toSet())));
+}
+
+private BlogPostRanker ranker() {
+  return ranker(MORNING);
+}
+
+private BlogPostRanker ranker(Clock clock) {
+  return new BlogPostRanker(clock);
+}
+
+private Label label(String name, Label.Classification classification) {
+  return new Label(name, classification);
+}
+
+private Label label(String name) {
+  return new Label(name, NEUTRAL);
+}
+
+private User userWithDefaultSettings() {
+  var preferences = new Preferences();
+  preferences.setChronologicalTimeline(false);
+  var user = new User();
+  user.setName("Lazy Defaulter");
+  user.setPreferences(preferences);
+  return user;
+}
+
+private User userWithInterestIn(Label... interests) {
+  var user = userWithDefaultSettings();
+  user.getPreferences().setInterests(Arrays.stream(interests).collect(Collectors.toSet()));
+  return user;
+}
+```
+
+Note that you don't need factory methods for every situation, just ones that are
+awkward to express within a test case.[^builders] In our example, I chose not to provide a
+separate factory method for users with muted labels. A test that needs one can
+do something like this:
+
+[^builders]:
+    If you use the builder pattern in your production code, you can also use it
+    in tests. It removes much of the awkwardness of setting up “traditional”
+    bean-style Java objects and records and may thus obviate the need for
+    factory methods. If there are many attributes required to construct a
+    semantically valid object, or if data structures are deeply nested,
+    factories can still be useful.
+
+```java
+@Test
+void ranking_should_keep_posts_with_muted_labels_if_the_same_label_is_interesting() {
+  var conflicted = label("conflicted");
+  var posts = List.of(somePost(conflicted));
+  var user = userWithInterestIn(conflicted);           // <-- base user config
+  user.getPreferences().setMuted(List.of(conflicted)); // <-- specifics for this test
+
+  var rankedPosts = ranker().rankPosts(posts, user);
+
+  assertThat(rankedPosts).hasSize(1);
+}
+```
+
+One more line of code in the test method to express a requirement that is
+specific to this test and not needed in most other tests seems like a reasonable
+trade-off to me.
+
+Which and how many factory methods to use depends on the complexity of the
+objects you need to construct and the variance you need in your tests.
+It is a matter of judgment.
+
+One additional point I want to make is about maintainability.
+Having object construction encapsulated in a factory saves you effort when
+changing things that don't have direct bearing on the test. If, for example,
+`BlogPostMetaData` gained a new attribute `lastChangedAt` to support updates
+to blog posts, every single constructor invocation needs to be changed to add
+this attribute (because `BlogPostMetaData` is a record), even though it is
+completely irrelevant to our test. With the factory methods shown above, there
+is exactly 1 place to change vs. 20 without them (or 11 in the very first
+version of the tests).
+
+I think our tests are pretty readable now. But there is still room for
+improvement. Up to now, we have focused our efforts on the Arrange phase.
+The Act phase is pretty lean already. It calls the method under test, no more.
+But what about the Assert phase?
+
+## Trick 6: Custom assertions
+Look at this test again:
+
+```java
+@Test
+void ranking_should_prefer_posts_with_interesting_labels_if_user_has_interests() {
+  var interestingPost = somePost(label("this-is-what-i-want"));
+  var posts = List.of(
+      somePost(),
+      somePost(),
+      interestingPost
+  );
+
+  var rankedPosts = ranker().rankPosts(posts, userWithInterestIn(label("this-is-what-i-want")));
+
+  assertThat(rankedPosts.getFirst()
+                        .metaData()
+                        .labels())
+      .map(Label::name)
+      .contains("this-is-what-i-want");
+}
+```
+
+Paraphrasing it in English, we get this:
+Let there be an interesting post, which is some post with the label “this-is-what-i-want”.
+Let there be a list of some posts, including the interesting one.
+Let the ranked posts be the result of ranking these posts for a user with
+interest in the label “this-is-what-i-want”.
+Then assert that the first of the ranked posts has meta data with labels which,
+when we map them to names, contain “this-is-what-i-want”.
+
+That last part doesn't really roll off the tongue, does it?
+Can we make this better?
+Of course we can!
+With [AssertJ custom assertions](https://assertj.github.io/doc/#assertj-core-custom-assertions)!
+While the first 5 tricks are actually not specific to Java or a particular
+testing framework or library, this one is.
+The tests in our toy example use [AssertJ](https://assertj.github.io/) as a
+baseline. If you don't yet know AssertJ, you should look into it. It lets you
+write succinct assertions in the fluent style you have been seeing throughout
+this post.
+And with custom assertions, you can add your own to deal with situations like
+these where deeply nested data structures make assertions awkward to write and
+hard to understand.
+
+You write custom assertions by extending the class `AbstractAssert`.
+Your assertion should have a constructor that takes the object about which
+assertions shall be made and implement methods with your custom checks.
+Per convention, the assertion should have a static method `assertThat` that
+accepts the object and returns an instance of your assertion. Each assertion
+should return `this` so they can be chained. In the method body you can perform
+any checks you like and call `AbstractAssert`'s methods to make the assertion
+fail if something is amiss.
+
+In our case, we reach into the deeply nested data structure and look for a label
+with the name we expect. If we don't find it, we fail with a descriptive
+message.[^doesNotHaveLabel]
+
+```java
+public class BlogPostAssert extends AbstractAssert<BlogPostAssert, BlogPost> {
+  public static BlogPostAssert assertThat(BlogPost blogPost) {
+    return new BlogPostAssert(blogPost);
   }
 
-  @Test
-  void ranking_should_prefer_posts_with_work_labels_in_the_morning() {
-    var posts = List.of(
-        somePost(label("neutral", NEUTRAL)),
-        somePost(label("leisure", LEISURE)),
-        somePost(label("work", WORK))
-    );
-
-    var rankedPosts = ranker(MORNING).rankPosts(posts, userWithDefaultSettings());
-
-    assertThat(rankedPosts
-        .getFirst()
-        .metaData()
-        .labels()
-        .stream()
-        .map(Label::name)).contains("work");
+  private BlogPostAssert(BlogPost blogPost) {
+    super(blogPost, BlogPostAssert.class);
   }
 
-  @Test
-  void ranking_should_prefer_posts_with_leisure_labels_in_the_evening() {
-    var posts = List.of(
-        somePost(label("neutral", NEUTRAL)),
-        somePost(label("leisure", LEISURE)),
-        somePost(label("work", WORK))
-    );
-
-    var rankedPosts = ranker(EVENING).rankPosts(posts, userWithDefaultSettings());
-
-    assertThat(rankedPosts
-        .getFirst()
-        .metaData()
-        .labels()
-        .stream()
-        .map(Label::name)).contains("leisure");
-  }
-
-  @Test
-  void ranking_should_assign_higher_priority_to_user_interests_than_to_timebased_classification_if_user_has_interests() {
-    var interestingLeisureLabel = label("interesting-leisure", LEISURE);
-    var interestingWorkLabel = label("interesting-work", WORK);
-    var posts = List.of(
-        somePost(label("boring-leisure", LEISURE)),
-        somePost(label("boring-work", WORK)),
-        somePost(interestingLeisureLabel),
-        somePost(interestingWorkLabel)
-    );
-
-    var rankedPosts = ranker(MORNING).rankPosts(posts,
-        userWithInterestIn(interestingLeisureLabel, interestingWorkLabel));
-
-    assertThat(rankedPosts.stream()
-        .map(post -> post.metaData().labels())
-        .flatMap(Set::stream)
-        .map(Label::name)).containsExactly("interesting-work",
-        "interesting-leisure",
-        "boring-work",
-        "boring-leisure");
-  }
-
-  @Test
-  void ranking_should_return_all_posts_if_user_has_no_muted_labels() {
-    var posts = List.of(
-        somePost(),
-        somePost(label("l1")),
-        somePost(label("l3"), label("l4"))
-    );
-    var user = userWithDefaultSettings();
-    user.getPreferences().setMuted(List.of());
-
-    var rankedPosts = ranker().rankPosts(posts, user);
-
-    assertThat(rankedPosts).hasSameSizeAs(posts);
-  }
-
-  @Test
-  void ranking_should_remove_posts_with_muted_labels_if_they_are_not_interesting() {
-    var muted1 = label("muted1");
-    var muted2 = label("muted2");
-    var posts = List.of(
-        somePost(),
-        somePost(label("l1")),
-        somePost(muted1),
-        somePost(label("l3"), label("l4")),
-        somePost(label("l5"), muted2)
-    );
-    var user = userWithDefaultSettings();
-    user.getPreferences().setMuted(List.of(muted1, muted2));
-
-    var rankedPosts = ranker().rankPosts(posts, user);
-
-    assertThat(rankedPosts).hasSize(3)
-        .allSatisfy(post -> assertThat(post.metaData()
-            .labels()
-            .stream()
-            .map(Label::name)).doesNotContain(muted1.name(),
-            muted2.name()));
-  }
-
-  @Test
-  void ranking_should_keep_posts_with_muted_labels_if_the_same_label_is_interesting() {
-    var conflicted = label("conflicted");
-    var posts = List.of(somePost(conflicted));
-    var user = userWithInterestIn(conflicted);
-    user.getPreferences().setMuted(List.of(conflicted));
-
-    var rankedPosts = ranker().rankPosts(posts, user);
-
-    assertThat(rankedPosts).hasSize(1);
-  }
-
-  private BlogPost somePost(Label... labels) {
-    return new BlogPost("Some topic",
-        "This is a generic blog post.",
-        new BlogPostMetaData(Instant.EPOCH,
-            new Author("Some Author",
-                "Born somewhere, Some got into writing after being bitten by a spider."),
-            Arrays.stream(labels).collect(Collectors.toSet())));
-  }
-
-  private BlogPostRanker ranker() {
-    return ranker(MORNING);
-  }
-
-  private BlogPostRanker ranker(Clock clock) {
-    return new BlogPostRanker(clock);
-  }
-
-  private Label label(String name, Label.Classification classification) {
-    return new Label(name, classification);
-  }
-
-  private Label label(String name) {
-    return new Label(name, NEUTRAL);
-  }
-
-  private User userWithDefaultSettings() {
-    var preferences = new Preferences();
-    preferences.setChronologicalTimeline(false);
-    var user = new User();
-    user.setName("Lazy Defaulter");
-    user.setPreferences(preferences);
-    return user;
-  }
-
-  private User userWithInterestIn(Label... interests) {
-    var user = userWithDefaultSettings();
-    user.getPreferences().setInterests(Arrays.stream(interests).collect(Collectors.toSet()));
-    return user;
+  public BlogPostAssert hasLabel(String expectedLabel) {
+    isNotNull();
+    var labels = actual.metaData().labels();
+    if (labels.isEmpty()) {
+      failWithMessage("Expected blog post to have label '%s' but it had none", expectedLabel);
+    }
+    if (labels.stream().noneMatch(l -> Objects.equals(l.name(), expectedLabel))) {
+      failWithMessage("Expected blog post to have label '%s' but it only had %s",
+                      expectedLabel,
+                      labels.stream().map(Label::name).collect(Collectors.joining("', '", "'", "'"))
+      );
+    }
+    return this;
   }
 }
 ```
 
-TODO: highlight improvements
-TODO: show next problem
+The assertion in the test above can now be written like this:
+```java
+assertThat(rankedPosts.getFirst()).hasLabel("this-is-what-i-want");
+```
 
-## Trick 6: Custom assertions
-TODO: explain
+This expresses the intention much more clearly. And in case something is wrong,
+the error message is much better, too.
+The old one (emitted by AssertJ's out-of-the-box assertions) looks like this:
 
+```
+java.lang.AssertionError:
+Expecting ArrayList:
+  []
+to contain:
+  ["this-is-what-i-want"]
+but could not find the following element(s):
+  ["this-is-what-i-want"]
+```
+
+The new one from our custom assertion looks like this:
+
+```
+java.lang.AssertionError: Expected blog post to have label 'this-is-what-i-want' but it had none
+```
+
+I know which one I would rather debug.
+
+[^doesNotHaveLabel]:
+    The [full code](TODO: insert link to code in repo) contains the additional custom
+    assertion `doesNotHaveLabel(String notExpectedLabel)`, omitted here for brevity.
+
+## The result
+After applying all 6 tricks, the complete test class looks like this:
 ```java
 class BlogPostRankerTest6 {
   private static final Clock MORNING = Clock.fixed(LocalDateTime.parse("2026-01-01T09:00:00")
-          .atZone(ZoneId.systemDefault())
-          .toInstant(),
-      ZoneId.systemDefault());
+                                                                .atZone(ZoneId.systemDefault())
+                                                                .toInstant(),
+                                                   ZoneId.systemDefault());
   private static final Clock EVENING = Clock.fixed(LocalDateTime.parse("2026-01-01T19:00:00")
-          .atZone(ZoneId.systemDefault())
-          .toInstant(),
-      ZoneId.systemDefault());
+                                                                .atZone(ZoneId.systemDefault())
+                                                                .toInstant(),
+                                                   ZoneId.systemDefault());
 
   @Test
   void ranking_should_prefer_posts_with_interesting_labels_if_user_has_interests() {
@@ -1214,6 +1318,7 @@ class BlogPostRankerTest6 {
         somePost(),
         interestingPost
     );
+
     var rankedPosts = ranker().rankPosts(posts, userWithInterestIn(label("this-is-what-i-want")));
 
     assertThat(rankedPosts.getFirst()).hasLabel("this-is-what-i-want");
@@ -1257,15 +1362,17 @@ class BlogPostRankerTest6 {
     );
 
     var rankedPosts = ranker(MORNING).rankPosts(posts,
-        userWithInterestIn(interestingLeisureLabel, interestingWorkLabel));
+                                                userWithInterestIn(interestingLeisureLabel,
+                                                                   interestingWorkLabel));
 
     assertThat(rankedPosts.stream()
-        .map(post -> post.metaData().labels())
-        .flatMap(Set::stream)
-        .map(Label::name)).containsExactly("interesting-work",
-        "interesting-leisure",
-        "boring-work",
-        "boring-leisure");
+                          .map(post -> post.metaData().labels())
+                          .flatMap(Set::stream)
+                          .map(Label::name))
+        .containsExactly("interesting-work",
+                         "interesting-leisure",
+                         "boring-work",
+                         "boring-leisure");
   }
 
   @Test
@@ -1300,8 +1407,9 @@ class BlogPostRankerTest6 {
     var rankedPosts = ranker().rankPosts(posts, user);
 
     assertThat(rankedPosts).hasSize(3)
-        .allSatisfy(post -> assertThat(post).doesNotHaveLabel(muted1.name())
-            .doesNotHaveLabel(muted2.name()));
+                           .allSatisfy(post ->
+                                           assertThat(post).doesNotHaveLabel(muted1.name())
+                                                           .doesNotHaveLabel(muted2.name()));
   }
 
   @Test
@@ -1318,11 +1426,11 @@ class BlogPostRankerTest6 {
 
   private BlogPost somePost(Label... labels) {
     return new BlogPost("Some topic",
-        "This is a generic blog post.",
-        new BlogPostMetaData(Instant.EPOCH,
-            new Author("Some Author",
-                "Born somewhere, Some got into writing after being bitten by a spider."),
-            Arrays.stream(labels).collect(Collectors.toSet())));
+                        "This is a generic blog post.",
+                        new BlogPostMetaData(Instant.EPOCH,
+                                             new Author("Some Author",
+                                                        "Born somewhere, Some got into writing after being bitten by a spider."),
+                                             Arrays.stream(labels).collect(Collectors.toSet())));
   }
 
   private BlogPostRanker ranker() {
@@ -1358,9 +1466,44 @@ class BlogPostRankerTest6 {
 }
 ```
 
-TODO: highlight improvements
+The total size of the final version of our tests is 227 lines of code versus 169 lines of
+code for the original version. A good portion of the additional bulk is due to
+the custom assertions.
+The main cause for the large difference is that our toy example does not have many tests.
+With a growing amount of test cases, the lines of code saved usually quickly begin to
+outweigh the (fixed) amount of code for the custom assertions.
 
-## Readable tests
-TODO: Fazit
-New tests: don't start at step 0. start at step 4! then extract factories as the
-need arises
+However, the version of our tests without custom assertions (after trick 5)
+weighs in at 195 lines of code, which is still about 15% more than the original
+version.
+This is because the goal was not to write less code.
+It was to have more readable, better understandable and easier to maintain
+tests.
+And on that count I trust you will agree, the final version wins hands down.
+
+## Conclusion
+Writing good tests is hard.
+Reading and understanding tests someone else wrote is even harder.
+If you are working with an old codebase and want to improve maintainability,
+these six tricks can help you transform messy tests into well-structured,
+readable ones:
+1. Separate the test code into the phases Arrange, Act, and Assert to understand what the tests do.
+2. Disentangle test cases until each each test case tests only one thing to get better signal from failing tests.
+3. Name tests following the schema “X should Y if Z” to communicate intent clearly.
+4. Put all relevant test data in each test case for ease of understanding and better test isolation.
+5. Introduce test data factories to eliminate boilerplate in the Arrange phase and reduce overhead when making changes.
+6. Use custom assertions to eliminate boilerplate in the Assert phase and improve failure messages.
+
+You don't need to apply all of the tricks at once to get value out of them.
+Even making just the first step will immediately make life easier when working
+with the tests.
+In my experience, once you have gotten past trick 3 (which is the most difficult one),
+you are already way ahead of the game.
+
+When writing new tests, starting at “trick level 4” incurs almost no overhead,
+and the overhead for “trick level 5“ is very low, so I usually do that by default.
+As the number of test cases grows, I try to spot opportunities for trick 6 and
+apply it only where it is really worth it.
+
+What's your experience writing and improving tests? Know any additional tricks?
+I'd love to hear from you, so please leave a comment below!
