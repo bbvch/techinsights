@@ -93,3 +93,11 @@ Git:
 DevOps:
   label: DevOps
   permalink: /devops
+
+Quality Assurance:
+  label: Quality Assurance
+  permalink: /quality-assurance
+
+AI-Assisted Development:
+  label: AI-Assisted Development
+  permalink: /ai-assisted-development
