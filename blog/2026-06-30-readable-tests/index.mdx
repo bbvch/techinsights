@@ -21,14 +21,14 @@ In this post, I will show how you can get more out of your tests with a few simp
 We will begin with a rather tangled unit test class and apply each trick in turn
 to arrive at a set of well-structured, readable tests that clearly communicate
 intent.
-While this is a toy example, it is modelled after real tests I encountered in
+While this is a toy example, it is modeled after real tests I encountered in
 customer projects.
 The complete code (including the implementation it tests) can be found in the
 GitHub repository [bbvch/readable-tests-example](https://github.com/bbvch/readable-tests-example).
 
 ## The example
-Our toy test is written in [Java](https://www.java.com/) and uses
-[JUnit](https://junit.org/) 5 and [AssertJ](https://assertj.github.io/doc/) for
+Our toy test is written in [Java 25](https://www.java.com/) and uses
+[JUnit 6](https://junit.org/) and [AssertJ](https://assertj.github.io/doc/) for
 fluent assertions.
 
 ```java
@@ -116,7 +116,7 @@ As you can see, this class appears to test a ranking algorithm for blog posts.
 There are labels involved, and obviously something can be muted.
 There also seems to be something time-based going on because we can see the test
 uses two different clocks.
-But I bet you can't really tell from the test code alone what exactly is beeing
+But I bet you can't really tell from the test code alone what exactly is being
 tested. Why, for example, does the expected label list at the end of
 `rankPosts()` look like the way it does?
 The first test case in particular contains a mixture of setup code, ranking
@@ -223,7 +223,7 @@ The phases are:
 - _Assert_ – check the result (output data and system state).
 
 [^given-when-then]:
-    The pattern is also known under the name
+    The pattern is also known as
     [Given, When, Then](https://martinfowler.com/bliki/GivenWhenThen.html).
 
 Our first trick is to look over the tests and identify which parts correspond to
@@ -371,7 +371,7 @@ fails, how do we know whether the other behaviors are correct? We can't!
 The more we pack into a single test method, the less information we get out of
 our tests. So the next step will be to remedy this.
 
-## Trick 2: Test one thing in each test case
+## Trick 2: Test one behavior in each test case
 To get better signal from failing tests, we are going to split our test methods
 into as many methods as needed to get them down to one behavior each.
 
@@ -445,7 +445,7 @@ Having redundant tests for the same thing hurts maintainability.
 If you are unsure whether deleting an assertion is really OK, you might wait
 until the next step before deciding, but in this case, the resulting test method
 would look so similar to the other one that I'm confident they would really be
-testing the same thing.
+testing the same behavior.
 
 The remaining assertion looks quite complex. This “work” and “leisure” stuff is
 similar to what we have above, but now it's combined with user interests.
@@ -585,8 +585,19 @@ the behavior.
 
 In the case of `ranking_conflicted()`, a better name would be
 `ranking_should_keep_posts_with_muted_labels_if_the_same_label_is_interesting()`.
-Yes, it's long, but now you can tell which number in the assertion is correct,
+Yes, it's long[^DisplayName], but now you can tell which number in the assertion is correct,
 right?[^solution]
+
+[^DisplayName]:
+    If you don't like long method names or snake case in your Java code, you can
+    also use the JUnit
+    [`@DisplayName` annotation](https://docs.junit.org/6.1.1/writing-tests/display-names.html)
+    to name your tests. Personally, I don't see the need. I have also on several
+    occasions observed drift between the “real” name of the test method and the
+    string in the `@DisplayName` annotation, which can cause confusion.
+    FWIW, there's also the
+    [`@DisplayNameGeneration` annotation](https://docs.junit.org/6.1.1/writing-tests/display-names.html#generator),
+    which can remove the underscores for display purposes.
 
 [^solution]:
     It's `1` because the label of the post is contained in both the set of
@@ -653,7 +664,8 @@ For example:
   }
 ```
 
-If you look at the [full source code of this step](TODO:insert link to repo),
+If you look at the
+[full source code of this step](https://github.com/bbvch/readable-tests-example/blob/main/src/test/java/blog/readabletests/BlogPostRankerTest3.java),
 you can see I adjusted the list of input posts in some other test cases, too,
 to match them to the business intent.
 
@@ -661,7 +673,7 @@ As I wrote at the beginning, this is the hardest step because there is really no
 shortcut to understanding the business intent behind the code you are testing.
 If you are writing new code with new tests, you are lucky. You probably already
 know why you are doing it. So please document the intent in the test names!
-You will make someone's life down the line much easier. And the someone might
+You will make someone's life down the line much easier. And that someone might
 even be you in 2 years.
 
 If you aren't the one who wrote the code, understanding the intent of a poorly
@@ -686,7 +698,7 @@ outside the tests themselves.
 
 You may also have noticed that the test data is shared among tests.
 While this is not a problem in every case, it does mean that I cannot simply
-change a single test, e. g., by adding a label to a blog post, without
+change a single test, e.g., by adding a label to a blog post, without
 considering the impact on all other tests that also use this blog post.
 Depending on the complexity of your test data and the number of tests,
 this can make maintenance a real PITA.
@@ -1117,8 +1129,8 @@ java.lang.AssertionError: Expected blog post to have label 'this-is-what-i-want'
 I know which one I would rather debug.
 
 [^doesNotHaveLabel]:
-    The [full code](TODO: insert link to code in repo) contains the additional custom
-    assertion `doesNotHaveLabel(String notExpectedLabel)`, omitted here for brevity.
+    The [full code](https://github.com/bbvch/readable-tests-example/blob/main/src/test/java/blog/readabletests/BlogPostAssert.java)
+    contains the additional custom assertion `doesNotHaveLabel(String notExpectedLabel)`, omitted here for brevity.
 
 ## The result
 After applying all 6 tricks, the complete test class looks like this:
@@ -1311,7 +1323,7 @@ If you are working with an old codebase and want to improve maintainability,
 these six tricks can help you transform messy tests into well-structured,
 readable ones:
 1. Separate the test code into the phases Arrange, Act, and Assert to understand what the tests do.
-2. Disentangle test cases until each each test case tests only one thing to get better signal from failing tests.
+2. Disentangle test cases until each each test case tests only one behavior to get better signal from failing tests.
 3. Name tests following the schema “X should Y if Z” to communicate intent clearly.
 4. Put all relevant test data in each test case for ease of understanding and better test isolation.
 5. Introduce test data factories to eliminate boilerplate in the Arrange phase and reduce overhead when making changes.
