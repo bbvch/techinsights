@@ -404,7 +404,7 @@ The one thing I changed is, I removed the Arrange/Act/Assert comments.
 If all your tests are structured like this, it is usually enough to separate the
 three parts with blank lines. In my opinion, adding section marker comments just
 adds noise unless the test case is really long, and if it is, you should
-probably change that instead of adding comments. YYMV.
+probably change that instead of adding comments.
 
 The first AAA sequence looks similar, but has an additional `hasSize` assertion.
 Given that `ranking_leisure()` does not need it, maybe this is a different
@@ -701,7 +701,7 @@ While this is not a problem in every case, it does mean that I cannot simply
 change a single test, e.g., by adding a label to a blog post, without
 considering the impact on all other tests that also use this blog post.
 Depending on the complexity of your test data and the number of tests,
-this can make maintenance a real PITA.
+this can make maintenance a real pain in the ass.
 
 ## Trick 4: All relevant test data in the test case
 To overcome these problems, we are going to pull (almost) all test data into the
@@ -801,7 +801,7 @@ class BlogPostRankerTest4 {
 }
 ```
 
-The `TestPosts` class is no more. 🪦
+The `TestPosts` class is no more.
 
 You'll notice we didn't inline `MORNING`, `EVENING`, and `SOME_AUTHOR`, but we
 moved the latter into the test class. This is because `SOME_AUTHOR` is kind of
