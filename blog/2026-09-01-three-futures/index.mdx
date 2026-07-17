@@ -1,0 +1,251 @@
+---
+title: "Three futures / Choosing your future / Choosing an approach for an upgrade project"
+description: "How to select a development approach for an upgrade project."
+authors:
+  - sebastianhans
+date: 2026-09-01
+tags: [architecture, Team Collaboration]
+image: ./images/cover.jpg
+---
+When developing the next iteration of an integration service while the old one
+is still being maintained, how do you decide on an approach? This post shows how
+envisioning possible futures helped us do it in a project for a large government
+organization.[^disclaimer]
+
+[^disclaimer]:
+    The specifics of the project have been slightly altered to avoid exposing
+    customer details, but the description of the approach reflects what we
+    really did.
+
+{/* truncate */}
+
+## Initial situation
+The organization was operating a third-party application to manage customer
+feedback. Initially, the application consisted of a rich client for internal staff, a
+backend and a database. It was connected to several internal services via an
+adapter component that had been developed and maintained in-house to decouple
+the application from the services. The adapter component provided REST endpoints
+used by the application to access customer and organizational data and also
+contained a handful of batch processes that wrote to the database owned by the
+application.
+
+When I say the adapter component had been developed and maintained in-house, I
+don't mean the organization employed software developers to do the work.
+I mean it had been developed by contractors and is operated and maintained as a
+“managed service”, which really means a single guy, also a contractor, is doing
+it.
+
+The third-party application had not been upgraded in a long time, and the
+version running at the customer site was nearing end of support. Therefore an
+upgrade project had been initiated with the goal of upgrading the application to
+a modern web-based version while preserving (and slightly improving) the
+business functionality.
+
+## The project
+The upgrade project was a major affair running for over a year. The part I was
+involved in was updating the adapter component. This update had been scheduled
+somewhere in the second half of the project. 
+Because this exceeded the capacity of the “managed service” (let's call him Fred),
+the organization hired a team of contractors to do this.
+I acted as the team's part-time lead developer.
+
+One of the first things I discussed with the dev team and Fred was how best to
+develop the new version while keeping the old version running in production,
+given the constraints we were operating under.
+
+## Constraints
+The first important constraint was time.
+The contract ran for three months with no option to extend it.
+And they meant that. When we started, the adapter was missing a feature the
+users really wanted because the previous contractor who had been hired to work
+on the component hadn't been able to complete it before running out of time.
+The organization prioritized budget over business functionality.
+This meant we would have to focus on the essential work early and do optional
+parts later if we still had time.
+
+Another constraint was that the release would not be done by us.
+Over the past few years, I have become used to developing software in DevOps mode
+where the developers are also responsible for bringing the software into
+production, including monitoring operations, handling any issues during
+migration, and cleaning up leftovers afterwards. In this project, however, the
+actual switch to the new version of the application in production was scheduled
+well past the end of our contract. This meant we would have to hand over
+whatever we had produced to Fred at the end of the project, and he would be the
+one dealing with the go-live and any issues during and after that.
+
+Because Fred was busy with operations, maintenance tasks and minor extensions to
+the old version, he was not part of the development team. This also
+meant he was likely to make some changes to the old version in parallel with the
+project that would have to be incorporated into the new version, too.
+
+And the last important thing to know about this project is that most of the
+changes implemented during the update were backward-incompatible by design.
+The intent was not only to migrate 1:1, but also to make some architectural
+improvements at the same time (replace database integration with REST APIs,
+replace batch processes with a request/response pattern,
+and redistribute responsibilities between the application and the
+adapter[^redistribution]).
+
+[^redistribution]:
+    In the old version, the application contained some logic dealing with the
+    specifics of the very services the adapter was supposed to abstract.
+    This logic was moved to the adapter as part of the update, resulting in a
+    cleaner architecture.
+
+## Three approaches
+Given these constraints, we considered three basic approaches:
+1. Develop the new version in a new repository, deploy it to the test environment
+   separately. Later deploy it to production along with the new application version,
+   switch users over, discard the old version.
+2. Add new behavior and endpoints to the existing version (with path-based API
+   versioning and feature flags for background processes that write to the database
+   (in the old version) or send data to the application's REST endpoints (in the
+   new version)), deploy to test and production continuously using the
+   regular path to production. Later deploy the new client, toggle feature
+   flags and switch users over, then remove old behavior/endpoints.
+3. Develop on a branch in the existing repository, continuously merge
+   maintenance updates from the main branch, deploy to test and production
+   continuously alongside the old version[^stateless] (introducing a second path to
+   production, with feature flags for background processes[^feature-flags]).
+   Later deploy the new client, toggle feature flags and switch users over, then
+   delete the old deployment. 
+   On success, the branch for the new version becomes the main branch.
+
+[^stateless]:
+    Side-by-side deployment was trivial because the new version was going to be
+    stateless with no shared infrastructure.
+
+[^feature-flags]:
+    The feature flags control only the last step in each process, the actual
+    writing/sending of data, because this depends on the presence of the receiver.
+    The preceding processing is always on – and logged – allowing us to verify
+    that it behaves correctly.
+
+But how to decide which approach to take?
+For this, we used our imagination to extrapolate what was likely to happen in
+each case, considering both the happy path and possible failure modes.
+Imagining these possible futures is a way of visualizing the interplay between
+the given constraints, the chosen option and the people involved. Discussing
+them within the team makes assumptions visible and enables us to address risks
+by making them concrete.
+Here is what we imagined.
+
+## The future with option 1
+We develop and test the new adapter version in isolation and hand it over to
+Fred after three months, along with architecture diagrams and detailed
+instructions for the migration, then leave. This is the default expectation from
+the customer. But let's see how this could play out!
+
+Fred has been making changes to the old repository in parallel due to
+maintenance and minor change requests, and we will not have been aware
+of all of them, so there is some repair work to be done after we have left.
+How will Fred do it? Probably in the time-honored way: by copying and pasting
+between the repositories.
+This is not trivial due to the structural changes we have made and thus likely
+to introduce subtle bugs. If Fred is lucky, he will catch them before go-live;
+if not, they will crop up some time later and cause extra work.
+
+Two months after we leave, the new version of the application is ready,
+and Fred wants to deploy the new adapter version to production. Some
+of the instructions are not entirely clear (because they never are) and he has
+forgotten some important points from the handover meeting (there is always
+something you nod along to but forget afterwards). Also, because we developed
+the solution in isolation, there will likely be some operational aspect we will have
+overlooked. All in all, deployment to production will not be trivial, and Fred
+will have to make some (hopefully minor) adjustments,
+probably over the course of a few weeks, before everything is running smoothly.
+
+Afterwards, he will have to remove the old deployment, archive the old
+repository, and update all documentation that references the repository to point
+to the new one. Such updates are likely to be
+incomplete, so references to the old repository will remain and confuse future
+developers (probably contractors without in-depth knowledge, too).
+
+## The future with option 2
+We add new adapter behavior to the existing adapter using the same development
+process as Fred (feature branches and pull requests to the main branch).
+New and changed REST endpoints are exposed under “v2” URL paths.
+Background processes that depend on the old or new version of the application
+being available are implemented behind feature flags and tested in the test
+environment in both variants (as soon as the new application version is
+available there).
+
+We see any changes Fred makes in his pull requests and can ensure they play
+together well with the new behavior.
+And Fred can see everything we are doing, too, so there is no real handover
+necessary at the end.
+
+Our changes are deployed to production along with Fred's changes, so when the
+new version of the application is ready to go live after we have left, the
+adapter is already ready for it in production. All that's left to do for Fred is
+to toggle the feature flags to enable the new behavior.
+The likelihood of something going wrong is drastically lower than with option 1,
+but if it does, Fred is in a much better position to fix it because he has been
+closer to our work the whole time, even though he was not officially part of the
+development team.
+
+After go-live, Fred will have to remove the old, now unused, endpoints and
+behavior from the adapter (including some infrastructure dependencies like the
+database connection), which means extra work for him, as well as a
+(small) risk of introducing errors.
+
+## The future with option 3
+We create a new branch from main in the existing repository and work on that.
+The branch contains the complete new version of the adapter with anything
+belonging only to the old version removed. We deploy the new version alongside
+the old one to the test and production environments (pretty simple to do with a
+Helm chart on a Kubernetes cluster). Background processes that depend on the new
+version of the application being available are implemented behind feature flags,
+which are switched on in the test environment, where the new application version
+is already deployed, but off in production, where it is not.
+
+We still see any changes Fred is making in his pull requests and merge them into
+the new branch periodically, adjusting them as needed for the new version.
+Fred can see everything we are doing due to the shared repository,
+but he is likely not paying as much attention as in option 2, so we still
+schedule handover sessions, but they are short and focused on the more subtle
+issues Fred might have missed during the project.
+This reduces the likelihood of later surprises when compared with option 1.
+
+When the new version of the application is ready for go-live after we have left,
+the new adapter version is already humming along in production, any deployment
+issues having already been solved by us. The only thing left to do for Fred is
+to toggle the feature flags to enable the new background processes.
+
+Clean-up is limited to decommissioning the deployment of the old adapter, a
+quick, low-risk change.
+
+## Deciding
+After imagining these possible futures, we had to decide which option to pick.
+Remember that these aren't predictions, just possibilities, and there were some
+differences in opinion on how much effort would need to go into setting up a
+separate deployment, and on how complex the cleanup in option 2 would be.
+
+In the end, the team decided to pursue option 3, but it was a close decision.
+Option 2 would have been a strong candidate too (option 1 was too error-prone in
+our opinion). The decisive factor was that option 3 would front-load most of the
+effort and leave Fred with as little work as possible.
+
+You might have come to a different conclusion, but the point I want to make here
+is not the decision itself. The point is that imagining these futures enabled us
+to make the decision together, based on a common understanding of the dynamics
+of the project.
+
+## Running with it
+My part in the project is finished now. The three months are up, a working new
+version of the adapter is running in production and we have had our handover
+session. Deploying to production early actually did expose some operational
+issues that Fred would otherwise have had to deal with.
+The actual go-live is still in the future and knowing the customer, I don't
+expect feedback on how it went anyway, so I can't say anything about that.
+
+Given the same constraints, I would make the same choice again, but my next
+project will probably have different ones so the best option might be different,
+too.
+At any rate, I will take with me the idea of exploring possible futures as a way
+to come to a decision in the face of constraints, assumptions and uncertainty.
+
+## Image credits
+- Cover image by
+  [Virgil Cayasa](https://unsplash.com/photos/crystal-ball-UbvcYKScirk)
+  on [Unsplash](https://unsplash.com), cropped and resized.
