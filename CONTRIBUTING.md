@@ -34,7 +34,7 @@ Thank you for contributing! This blog is a simple, engineer-driven space for tec
    3. Find together with [@bbv-blogger-admin team](https://github.com/orgs/bbvch/teams/bbv-blog-admin) a person who would write a blog on bbv.ch
    4. Arrange a date with [@bbv-blogger-admin team](https://github.com/orgs/bbvch/teams/bbv-blog-admin) (In Roadmap view)
 3. Start with writing
-   1. Convert to an issue
+   1. Convert work item draft to an issue
    2. Put it "in progress"
    3. Assign it to yourself
    4. Create a branch (e.g., `blog/my-post-slug`) for your blog post.
@@ -118,6 +118,7 @@ image: ./images/cover.png # relative path to the cover image for this post, used
 - Cite sources and provide links for further reading.
 - Maintain a respectful and professional tone.
 - If your post includes third-party code, ensure licensing is clear.
+- If you use diagrams, pictures or other color elements, check their appearance with dark and bright backgrounds.
 
 ## Support & questions
 
