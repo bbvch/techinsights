@@ -93,3 +93,7 @@ Git:
 DevOps:
   label: DevOps
   permalink: /devops
+
+Java:
+  label: Java
+  permalink: /java
