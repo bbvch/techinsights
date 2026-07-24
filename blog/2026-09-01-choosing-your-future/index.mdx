@@ -1,5 +1,5 @@
 ---
-title: "Three futures / Choosing your future / Choosing an approach for an upgrade project"
+title: "Choosing your future"
 description: "How to select a development approach for an upgrade project."
 authors:
   - sebastianhans
@@ -7,6 +7,8 @@ date: 2026-09-01
 tags: [architecture, Team Collaboration]
 image: ./images/cover.jpg
 ---
+import CenteredImage from '@site/src/components/Image';
+
 When developing the next iteration of an integration service while the old one
 is still being maintained, how do you decide on an approach? This post shows how
 envisioning possible futures helped us do it in a project for a large government
@@ -28,6 +30,12 @@ the application from the services. The adapter component provided REST endpoints
 used by the application to access customer and organizational data and also
 contained a handful of batch processes that wrote to the database owned by the
 application.
+
+<CenteredImage 
+  src={require("./images/architecture-before.png").default}
+  width={500}
+  caption="Initial architecture showing the third-party components (black), the adapter (orange) and the in-house services (blue)"
+/>
 
 When I say the adapter component had been developed and maintained in-house, I
 don't mean the organization employed software developers to do the work.
@@ -91,6 +99,12 @@ adapter[^redistribution]).
     specifics of the very services the adapter was supposed to abstract.
     This logic was moved to the adapter as part of the update, resulting in a
     cleaner architecture.
+
+<CenteredImage 
+  src={require("./images/architecture-after.png").default}
+  width={500}
+  caption="Target architecture showing the third-party components (black), the adapter (orange) and the in-house services (blue)"
+/>
 
 ## Three approaches
 Given these constraints, we considered three basic approaches:
