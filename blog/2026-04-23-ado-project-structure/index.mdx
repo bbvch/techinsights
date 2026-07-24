@@ -3,15 +3,25 @@ title: "Designing Azure DevOps Projects for Real-World Complexity"
 description: "How you structure your Azure DevOps project shapes everything that follows — from team visibility to sprint planning. This guide walks through three real-world scenarios of increasing complexity, so you can make that foundational decision with confidence."
 authors:
   - vanescoboehm
-tags: [Azure DevOps, Project Structure, Agile, Area Paths, Iterations, Team Configuration, Team Collaboration]
+tags:
+  [
+    Azure DevOps,
+    Project Structure,
+    Agile,
+    Area Paths,
+    Iterations,
+    Team Configuration,
+    Team Collaboration,
+  ]
 image: ./images/ADO-simple-project-structure.jpg
 date: 2026-04-23
 ---
 
-
 _Companion blog for deciders: [Die Architektur der Empirie: Wie die Azure DevOps Struktur Management und Entwicklung vereinen kann](https://bbv.ch/insights/blog/die-architektur-der-empirie-wie-die-azure-devops-struktur-management-und-entwicklung-vereinen-kann/)_
 
 **The most consequential Azure DevOps configuration decision you make is also the easiest to get wrong: how to structure your project.** Microsoft's default guidance is clear — start with one project and scale using Teams, Area Paths, and Iteration Paths. This guide walks through three scenarios of increasing complexity, including a concrete, tested solution for the hardest case: multiple teams sharing work across multiple products. It also covers the narrow set of situations where a second project genuinely makes sense.
+
+{/* truncate */}
 
 ---
 
@@ -21,7 +31,7 @@ Before walking through scenarios, it helps to understand the four mechanisms tha
 
 **Organizations and Projects** form the outer structure. An organization is your top-level namespace (e.g., `dev.azure.com/your-company`); a project contains all work items, repositories, pipelines, boards, and wikis. For the overwhelming majority of teams, one project per company or product group is the right default. Multiple projects in the same organization are possible but introduce real trade-offs, covered briefly at the end of this article.
 
-**Teams** are configurable views into the project's shared work item pool. When you create a team, Azure DevOps automatically provisions a backlog, Kanban board, sprint view, and dashboard for it. A team does not *own* work items — it *filters* them. This distinction shapes every configuration decision that follows.
+**Teams** are configurable views into the project's shared work item pool. When you create a team, Azure DevOps automatically provisions a backlog, Kanban board, sprint view, and dashboard for it. A team does not _own_ work items — it _filters_ them. This distinction shapes every configuration decision that follows.
 
 **Area Paths** are hierarchical labels that define what a work item belongs to. Teams are assigned to one or more area paths, and only work items with a matching area path appear on that team's backlog and board. The golden rule for Kanban boards: each work item should appear on exactly one team's board. Assigning overlapping area paths to multiple teams causes silent conflicts in the board column state fields (`Board Column`, `Board Column Done`, `Board Lane`).
 
@@ -78,7 +88,7 @@ The **Delivery Plans** widget rounds out this scenario by providing a cross-team
 
 This scenario introduces a second dimension of complexity: separating product ownership from team responsibility.
 
-This is where standard Azure DevOps guidance becomes less prescriptive. The challenge: multiple teams need to work across multiple products, individual engineers may pick up stories from any product, and some teams — like a shared testing or platform team — span *all* products. A simple area-path-per-team model breaks down here because it conflates team ownership with product ownership.
+This is where standard Azure DevOps guidance becomes less prescriptive. The challenge: multiple teams need to work across multiple products, individual engineers may pick up stories from any product, and some teams — like a shared testing or platform team — span _all_ products. A simple area-path-per-team model breaks down here because it conflates team ownership with product ownership.
 
 ### Why mixing teams and products in area paths fails
 
@@ -88,8 +98,8 @@ If area paths carry both product and team identity (e.g., `Product A\Team Alpha`
 
 One proven approach separates product ownership from team responsibility:
 
-- **Area Paths represent products.** A work item's area path tells you *which product* it belongs to, not *which team* is working on it.
-- **Subiterations represent team assignment within a sprint.** Each sprint node in the iteration hierarchy contains one child node per team. A work item's iteration path tells you both which sprint it belongs to *and* which team is responsible for it in that sprint.
+- **Area Paths represent products.** A work item's area path tells you _which product_ it belongs to, not _which team_ is working on it.
+- **Subiterations represent team assignment within a sprint.** Each sprint node in the iteration hierarchy contains one child node per team. A work item's iteration path tells you both which sprint it belongs to _and_ which team is responsible for it in that sprint.
 
 ```
 Area Path structure:
@@ -161,6 +171,7 @@ An alternative is to keep the standard model:
 - Iteration Paths represent **time only**
 
 Cross-product collaboration is handled through:
+
 - shared Epics and Features
 - Delivery Plans for cross-team visibility
 - queries and dashboards
@@ -176,7 +187,7 @@ The single-project model handles almost every scenario. A second project is wort
 
 **Different process templates.** Process templates are per-project. If one product runs Scrum and another requires CMMI (common in regulated industries), they cannot share a project.
 
-**Hard security boundaries.** Area path permissions restrict visibility at a granular level, but project membership still grants broad default access. For strict client data separation — GDPR compliance, regulated financial data, defense contracts — project-level isolation provides a stronger boundary. Note that the **"Limit user visibility and collaboration to specific projects"** preview feature, combined with the *Project-Scoped Users* group, can partially address GDPR concerns around guest user exposure within a single organization.
+**Hard security boundaries.** Area path permissions restrict visibility at a granular level, but project membership still grants broad default access. For strict client data separation — GDPR compliance, regulated financial data, defense contracts — project-level isolation provides a stronger boundary. Note that the **"Limit user visibility and collaboration to specific projects"** preview feature, combined with the _Project-Scoped Users_ group, can partially address GDPR concerns around guest user exposure within a single organization.
 
 **Public projects.** If one project needs to be publicly accessible (open source work, community feedback), it must be isolated from internal projects.
 
@@ -194,7 +205,7 @@ Cross-project trade-offs to understand before creating a second project: cross-p
 
 **Setting the backlog iteration too narrowly.** If a team's **Backlog Iteration** is set to a specific sprint rather than the root node, unscheduled product backlog items disappear from the team's backlog view. Always set the backlog iteration to the highest relevant ancestor node.
 
-**Creating subiterations but not updating team iteration settings.** When you add a new subiteration, each team must go to *Project Settings → [Team] → Iterations* and mark it as active. This is a common operational mistake with the subiteration pattern and easy to overlook during sprint kickoff.
+**Creating subiterations but not updating team iteration settings.** When you add a new subiteration, each team must go to _Project Settings → [Team] → Iterations_ and mark it as active. This is a common operational mistake with the subiteration pattern and easy to overlook during sprint kickoff.
 
 ---
 
@@ -205,7 +216,6 @@ Azure DevOps project structure rewards deliberate, incremental setup. Start with
 For the hard case — multiple teams sharing work across multiple products — the combination of product-based area paths and team-based subiterations provides clean separation without sacrificing cross-team visibility. The cost is per-sprint iteration node creation; the benefit is that every work item carries two independent dimensions of context (product and team) without conflating them in a single field.
 
 However, if teams are stable and aligned to specific products, cross-product work is limited, or reporting simplicity is a priority, the standard model with team-based area paths remains the better choice.
- 
 
 The architectural principle behind all three scenarios is the same: **teams are views, not containers.** A team is a configured lens that filters the project's shared work item pool through area path assignments and iteration selections. Understanding this makes every configuration decision a deliberate choice about what each team needs to see — rather than a structural wall between teams.
 

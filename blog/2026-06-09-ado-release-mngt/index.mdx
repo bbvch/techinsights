@@ -3,19 +3,27 @@ title: "Release Management in Azure DevOps: A Comparison of Options, Common Anti
 description: "Which mechanism you use to track release scope in Azure DevOps shapes what your team can see, query, and report on. This article walks through six options — their trade-offs, anti-patterns to avoid, and how to combine them when one approach isn't enough."
 authors:
   - vanescoboehm
-tags: [Azure DevOps, Release Management, Agile, Custom Work Items, Team Collaboration]
+tags:
+  [
+    Azure DevOps,
+    Release Management,
+    Agile,
+    Custom Work Items,
+    Team Collaboration,
+  ]
 image: ./images/ado-release-mngmt.jpg
 date: 2026-06-09
 ---
 
-import CenteredImage from '@site/src/components/Image';
-
+import CenteredImage from "@site/src/components/Image";
 
 **Azure DevOps has no built-in Release work item type — and the gap has at least six different solutions, each borrowed from a feature built for something else.**
 
 Every team shipping software eventually needs to answer the same questions: which stories are going into Release 2.5? Which might slip to 2.6? Can a story belong to both? Who can see this during sprint planning, and who can report on it afterward? The answer depends entirely on which mechanism you reach for — and the trade-offs between them are real and non-obvious.
 
 This article walks through each option using a consistent example: a development team preparing Release 2.5, with a handful of stories that might partially deliver in 2.5 and complete in 2.6, and a product owner who needs release membership visible during sprint reviews and in progress reports.
+
+{/* truncate */}
 
 ---
 
@@ -52,10 +60,11 @@ Epic:     "Product v2"
 └── Feature:  "Release 2.6"
     └── Story: "Role-based permissions"
 ```
+
 <CenteredImage
-src={require("./images/backlog-features-for-release.jpg").default}
-width={650}
-caption="The backlog's UI can be convenient when using features for release management."
+  src={require("./images/backlog-features-for-release.jpg").default}
+  width={650}
+  caption="The backlog's UI can be convenient when using features for release management."
 />
 
 This requires zero configuration. The Feature form provides release metadata immediately: description, start and end dates, an assigned owner, acceptance criteria, and comments. Sprint backlog views show the parent Feature name when "Show parents" is enabled. Delivery Plans treats Features as first-class timeline items, making cross-team release scope visible with no additional setup.
@@ -86,10 +95,11 @@ Release WIT: "Release 2.5"
         ← Story: "Fix session timeout bug"
         ← Story: "Role-based permissions"   ← also linked to Release 2.6
 ```
+
 <CenteredImage
-src={require("./images/custom-wit-release.jpg").default}
-width={650}
-caption="Stories can be linked as related when using a custom work item type for release planning."
+  src={require("./images/custom-wit-release.jpg").default}
+  width={650}
+  caption="Stories can be linked as related when using a custom work item type for release planning."
 />
 
 The key advantage over using a Feature as the release container is that a Story can be linked to multiple Release work items simultaneously. The Related link type uses a many-to-many topology — there is no parent-child tree constraint. "Role-based permissions" can appear under both Release 2.5 and Release 2.6 without splitting the story. There is also no conflict with existing Features: releases live as a separate type with their own backlog view.
@@ -111,9 +121,9 @@ For release management, tags like `release-2.5` and `release-2.6` provide multi-
 The problem is governance — and it compounds over time. Tags are free-form and unconstrained across the entire project. `Release 2.5`, `release-2.5`, `R2.5`, and `rel_2.5` are four distinct tags with no relationship to each other. There is no approval step, no deduplication, and no enforcement. A naming convention established in January will have accumulated variants by April in any team larger than a handful of people.
 
 <CenteredImage
-src={require("./images/tags-for-releases.jpg").default}
-width={400}
-caption="Tags can be tempting to use because of their simplicity and versatility."
+  src={require("./images/tags-for-releases.jpg").default}
+  width={400}
+  caption="Tags can be tempting to use because of their simplicity and versatility."
 />
 
 Tags carry no metadata. A tag is a string — there is no release date, owner, description, or status attached to it. Reporting is also constrained: query-based charts cannot group results by tag; only the "Chart for Work Items" dashboard widget supports tag grouping, and Analytics queries require additional workarounds to use tags cleanly. Sprint burndown and velocity charts have no awareness of tags at all.
@@ -137,9 +147,9 @@ User Story: "Login with SSO"
 ```
 
 <CenteredImage
-src={require("./images/custom-field-release.jpg").default}
-width={650}
-caption="Custom fields with release information can be directly visible on story cards in the sprint Taskboard."
+  src={require("./images/custom-field-release.jpg").default}
+  width={650}
+  caption="Custom fields with release information can be directly visible on story cards in the sprint Taskboard."
 />
 
 The field can be used as a filter criterion in Delivery Plans via its field criteria settings, and works natively with Analytics, Power BI, and query-based charts. Grouping by a clean categorical field requires no text-splitting workarounds. Neither the standard backlog filter toolbar nor the sprint board exposes custom fields: seeing release membership during sprint execution requires a saved query rather than a UI toggle, which is a genuine daily-use gap that teams should factor in before choosing this option.
@@ -182,7 +192,7 @@ The other consideration is organizational: extensions require admin approval and
 
 ## Iteration Paths
 
-Iteration paths are the time axis of Azure Boards. Their job is to answer exactly one question: *when is this work scheduled?* Every sprint-facing feature in Azure DevOps — the sprint board, sprint backlog, burndown chart, velocity chart, capacity planning, and the `@CurrentIteration` query macro — is built around iteration paths as time periods with start and end dates. Their natural use is sprint scheduling: "Sprint 22" runs May 4–17, "Sprint 23" follows, and work items move through them.
+Iteration paths are the time axis of Azure Boards. Their job is to answer exactly one question: _when is this work scheduled?_ Every sprint-facing feature in Azure DevOps — the sprint board, sprint backlog, burndown chart, velocity chart, capacity planning, and the `@CurrentIteration` query macro — is built around iteration paths as time periods with start and end dates. Their natural use is sprint scheduling: "Sprint 22" runs May 4–17, "Sprint 23" follows, and work items move through them.
 
 It is technically possible to use iteration paths as release containers by adding a release level as parent nodes:
 
@@ -198,7 +208,7 @@ MyOrg
 
 The appeal is zero configuration and a native hierarchical rollup: selecting "Release 2.5" in the iteration picker shows all work across both of its sprints. The sprint board, backlog, and burndown all function as normal under each leaf sprint node.
 
-The problem is that this structure conflates two independent questions — *when?* and *which release?* — into a single field. Sprint velocity and burndown charts assume iterations are uniform time boxes; the addition of parent release nodes distorts these calculations. If a story moves from Release 2.5 to 2.6, its iteration path must be updated on every affected work item. Teams running continuous delivery on a fixed sprint cadence — which is the norm — will find that the release hierarchy fights the natural shape of their sprint schedule.
+The problem is that this structure conflates two independent questions — _when?_ and _which release?_ — into a single field. Sprint velocity and burndown charts assume iterations are uniform time boxes; the addition of parent release nodes distorts these calculations. If a story moves from Release 2.5 to 2.6, its iteration path must be updated on every affected work item. Teams running continuous delivery on a fixed sprint cadence — which is the norm — will find that the release hierarchy fights the natural shape of their sprint schedule.
 
 There is also no release metadata: iteration nodes have a name and dates, and nothing else.
 
@@ -222,21 +232,21 @@ Teams in regulated industries or those with strong traceability requirements oft
 
 ## Comparison
 
-All options compared across the dimensions that matter for release management. Delivery Plans and pipeline-driven links are excluded — they are not categorization alternatives but complementary tools described in the section above.  A (+) indicates a strength, a (−) a weakness, and (+/−) a trade-off or context-dependent characteristic.
+All options compared across the dimensions that matter for release management. Delivery Plans and pipeline-driven links are excluded — they are not categorization alternatives but complementary tools described in the section above. A (+) indicates a strength, a (−) a weakness, and (+/−) a trade-off or context-dependent characteristic.
 
-| | **Feature / Epic** | **Custom WIT** | **Tags** | **Custom Picklist** | **Multi-Value Picklist** | **Iteration Path** |
-|---|---|---|---|---|---|---|
-| **Original purpose** | Group stories into shippable capabilities | Domain entities with their own lifecycle | Ad-hoc, informal labels | Governed single-value metadata | Governed multi-value metadata | Sprint / time scheduling |
-| **Multi-release assignment** | One parent only (-) | Via Related links (+) | Many tags per item (+) | Single value (-) | Multiple values (+) | Single iteration (-) |
-| **Governed values** | Name only (+/-) | Name only (+/-) | Free-form (-) | Enumerated picklist (+) | Enumerated via extension (+) | Defined by admin (+) |
-| **Backlog / Delivery Plans filter** | Via parent hierarchy (+) | Requires saved query (-) | Native (+) | Delivery Plans only; saved query for backlog (-) | Delivery Plans only, "Contains"; saved query for backlog (-) | Native (+) |
-| **Sprint board visibility** | "Show parents" only (+/-) | Not available (-) | Native filter; hides parent grouping (+) | Not available (-) | Not available (-) | Native (+) |
-| **Release has own metadata** | Dates, owner, description (+) | Full custom form (+) | String only (-) | String only (-) | String only (-) | Dates & name only (+/-) |
-| **Release has own workflow** | Inherits WIT states (+) | Custom states (+) | No (-) | No (-) | No (-) | No (-) |
-| **Analytics / Power BI** | Hierarchy rollup (+) | Via linked-item queries (+/-) | Dashboard widget only; burndown/velocity unaware (-) | Clean categorical field (+) | Needs text-split logic (+/-) | Works, conflates time & scope (+/-) |
-| **Setup complexity** | None (+) | Medium; affects all projects on process template (-) | None (+) | Low; admin needed to add/change values (+/-) | Low; requires extension; admin needed to add/change values (-) | None (+) |
-| **Extension required** | No (+) | No (+) | No (+) | No (+) | Yes - degrades to plain text if abandoned (-) | No (+) |
-| **Conflicts with standard usage** | If Features are already in use (+/-) | No conflict (+) | No conflict (+) | No conflict (+) | No conflict (+) | Conflates time & scope (+/-) |
+|                                     | **Feature / Epic**                        | **Custom WIT**                                       | **Tags**                                             | **Custom Picklist**                              | **Multi-Value Picklist**                                       | **Iteration Path**                  |
+| ----------------------------------- | ----------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------- | ----------------------------------- |
+| **Original purpose**                | Group stories into shippable capabilities | Domain entities with their own lifecycle             | Ad-hoc, informal labels                              | Governed single-value metadata                   | Governed multi-value metadata                                  | Sprint / time scheduling            |
+| **Multi-release assignment**        | One parent only (-)                       | Via Related links (+)                                | Many tags per item (+)                               | Single value (-)                                 | Multiple values (+)                                            | Single iteration (-)                |
+| **Governed values**                 | Name only (+/-)                           | Name only (+/-)                                      | Free-form (-)                                        | Enumerated picklist (+)                          | Enumerated via extension (+)                                   | Defined by admin (+)                |
+| **Backlog / Delivery Plans filter** | Via parent hierarchy (+)                  | Requires saved query (-)                             | Native (+)                                           | Delivery Plans only; saved query for backlog (-) | Delivery Plans only, "Contains"; saved query for backlog (-)   | Native (+)                          |
+| **Sprint board visibility**         | "Show parents" only (+/-)                 | Not available (-)                                    | Native filter; hides parent grouping (+)             | Not available (-)                                | Not available (-)                                              | Native (+)                          |
+| **Release has own metadata**        | Dates, owner, description (+)             | Full custom form (+)                                 | String only (-)                                      | String only (-)                                  | String only (-)                                                | Dates & name only (+/-)             |
+| **Release has own workflow**        | Inherits WIT states (+)                   | Custom states (+)                                    | No (-)                                               | No (-)                                           | No (-)                                                         | No (-)                              |
+| **Analytics / Power BI**            | Hierarchy rollup (+)                      | Via linked-item queries (+/-)                        | Dashboard widget only; burndown/velocity unaware (-) | Clean categorical field (+)                      | Needs text-split logic (+/-)                                   | Works, conflates time & scope (+/-) |
+| **Setup complexity**                | None (+)                                  | Medium; affects all projects on process template (-) | None (+)                                             | Low; admin needed to add/change values (+/-)     | Low; requires extension; admin needed to add/change values (-) | None (+)                            |
+| **Extension required**              | No (+)                                    | No (+)                                               | No (+)                                               | No (+)                                           | Yes - degrades to plain text if abandoned (-)                  | No (+)                              |
+| **Conflicts with standard usage**   | If Features are already in use (+/-)      | No conflict (+)                                      | No conflict (+)                                      | No conflict (+)                                  | No conflict (+)                                                | Conflates time & scope (+/-)        |
 
 ---
 
@@ -299,4 +309,4 @@ The mechanisms described here are not mutually exclusive. The most complete setu
 - [**Configure pipelines to support work tracking** — Microsoft Learn](https://learn.microsoft.com/en-us/azure/devops/pipelines/integrations/configure-pipelines-work-tracking?view=azure-devops)
 - [**Building a roadmap and tracking dependencies across teams with Delivery Plans** — Azure DevOps Hands-on Labs. A practical lab that walks through configuring Delivery Plans for cross-team release scope visualization and dependency tracking.](https://www.azuredevopslabs.com/labs/azuredevops/deliveryplans/)
 - [**Multivalue Control extension** — Microsoft DevLabs (open-source)](https://marketplace.visualstudio.com/items?itemName=ms-devlabs.vsts-extensions-multivalue-control)
-- [**Work tracking, process, and project limits** — Authoritative reference for tag limits, picklist limits, and WIT constraints.](https://learn.microsoft.com/en-us/azure/devops/organizations/settings/work/object-limits?view=azure-devops) 
+- [**Work tracking, process, and project limits** — Authoritative reference for tag limits, picklist limits, and WIT constraints.](https://learn.microsoft.com/en-us/azure/devops/organizations/settings/work/object-limits?view=azure-devops)

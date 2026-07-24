@@ -7,13 +7,13 @@ image: ./images/cover.png
 date: 2026-06-30
 ---
 
-import CenteredImage from '@site/src/components/Image';
-import ContextDiagram from './images/context.svg';
-import SystemDiagram from './images/system.svg';
+import CenteredImage from "@site/src/components/Image";
+import ContextDiagram from "./images/context.svg";
+import SystemDiagram from "./images/system.svg";
 
-*Building a home-automation system with AI was fast. Making it survive contact with real weather, real hardware, and real edge cases was the actual work. What I learned about where AI helps and where judgment still has to come from you.*
+_Building a home-automation system with AI was fast. Making it survive contact with real weather, real hardware, and real edge cases was the actual work. What I learned about where AI helps and where judgment still has to come from you._
 
-___
+{/* truncate */}
 
 I had picked the simplest design I could get away with for the blinds in my apartment: cut the daily glare without me having to lower them by hand. The blinds run on small smart switches tucked behind the wall panels at each window, and the idea was to let each one pull the current sun-radiation reading straight from MeteoSwiss, parse it, and decide whether to lower the slats. No server, no proxy, nothing extra to keep alive. I found the open-data endpoints, pasted the URLs to Claude, and asked a plain question: could the switch call this directly and check the weather itself?
 
@@ -29,11 +29,17 @@ I'd never worked with any of this: the smart switches, the embedded scripting th
 
 The shape is simple enough to hold in your head: eight windows, each with a switch running the blinds logic on the device itself, and a small proxy on the NAS feeding it the weather data it couldn't fetch on its own.
 
-<figure style={{ margin: '2em auto', maxWidth: '100%', textAlign: 'center' }}>
+<figure style={{ margin: "2em auto", maxWidth: "100%", textAlign: "center" }}>
   <ContextDiagram
     role="img"
     aria-labelledby="context-title context-desc"
-    style={{ display: 'block', margin: '0 auto', width: '100%', maxWidth: 958, height: 'auto' }}
+    style={{
+      display: "block",
+      margin: "0 auto",
+      width: "100%",
+      maxWidth: 958,
+      height: "auto",
+    }}
   />
   <figcaption>The system at a glance.</figcaption>
 </figure>
@@ -62,7 +68,7 @@ It took a couple of mornings to find out what "done" had been worth.
 
 ## Coffee, and a glare
 
-I was making coffee. The sun came up over the east windows, cleared whatever it clears at that hour, and hit me straight in the eyes, full, low, unfiltered, the exact glare the whole system existed to prevent. The blinds had not moved. Whatever they were deciding, it wasn't *shade the kitchen.*
+I was making coffee. The sun came up over the east windows, cleared whatever it clears at that hour, and hit me straight in the eyes, full, low, unfiltered, the exact glare the whole system existed to prevent. The blinds had not moved. Whatever they were deciding, it wasn't _shade the kitchen._
 
 I connected to that window's switch and read back what it had logged. My first guess was the obvious one: the MeteoSwiss numbers were fine, my thresholds just didn't work at this hour: too forgiving at a low sun, when even a modest reading means real glare. So I went looking to retune them against the time since sunrise.
 
@@ -72,17 +78,23 @@ The data had an odd feature, though. The radiation reading sat roughly flat for 
 
 Something was clearing, the reasoning went (a horizon haze layer, a neighbouring building, a tree), and at that instant the attenuated early light gave way to the full direct beam. Chasing it with a steeper curve would be a mistake: the angle at which that happens shifts with the season and the weather, so a formula fitted to today's break-through point would simply be wrong on another morning.
 
-It was a clean explanation, and I didn't buy it. The reading wasn't coming from a sensor on my windowsill. It was a MeteoSwiss station, sited, calibrated, and maintained by people whose job is precisely to make sure nothing nearby shades the instrument. An obstruction in front of *that* was the one thing I could rule out by knowing where the number came from. The explanation was plausible, and it didn't survive this single fact about the world that produced the data.
+It was a clean explanation, and I didn't buy it. The reading wasn't coming from a sensor on my windowsill. It was a MeteoSwiss station, sited, calibrated, and maintained by people whose job is precisely to make sure nothing nearby shades the instrument. An obstruction in front of _that_ was the one thing I could rule out by knowing where the number came from. The explanation was plausible, and it didn't survive this single fact about the world that produced the data.
 
-So we stopped theorizing about the jump and went back to what the measurement actually was. The figure I had been feeding the system was global radiation on a *horizontal* surface. My windows are vertical. I had been comparing a number measured flat on the ground against a threshold meant for light striking glass standing up, two different quantities, treated as one. No threshold and no obstruction theory would ever have fixed that. The horizontal reading had to be projected onto the plane of the window, accounting for where the sun actually was, before any of it meant anything at all.
+So we stopped theorizing about the jump and went back to what the measurement actually was. The figure I had been feeding the system was global radiation on a _horizontal_ surface. My windows are vertical. I had been comparing a number measured flat on the ground against a threshold meant for light striking glass standing up, two different quantities, treated as one. No threshold and no obstruction theory would ever have fixed that. The horizontal reading had to be projected onto the plane of the window, accounting for where the sun actually was, before any of it meant anything at all.
 
 Finding that out had been harder than it should have been. To see what a device was deciding, I'd had to open a browser onto that specific switch and read its built-in log, one device at a time, in a format that fought me for every line, with almost no history to scroll back through. Diagnosing one bad sunrise meant catching it close to live. That was untenable, and it was the reason the system grew a piece I hadn't planned: a small log receiver on the NAS, designed in conversation and then generated, with every switch reporting each decision and the values behind it over UDP, written to files I could read whenever I got to them. The slow world could now record itself while I wasn't watching.
 
-<figure style={{ margin: '2em auto', maxWidth: '100%', textAlign: 'center' }}>
+<figure style={{ margin: "2em auto", maxWidth: "100%", textAlign: "center" }}>
   <SystemDiagram
     role="img"
     aria-labelledby="context-title context-desc"
-    style={{ display: 'block', margin: '0 auto', width: '100%', maxWidth: 950, height: 'auto' }}
+    style={{
+      display: "block",
+      margin: "0 auto",
+      width: "100%",
+      maxWidth: 950,
+      height: "auto",
+    }}
   />
   <figcaption>Inside the automation system.</figcaption>
 </figure>
@@ -91,28 +103,28 @@ Finding that out had been harder than it should have been. To see what a device 
 
 With the decisions finally legible, the next failure was easy to catch and more interesting to fix.
 
-One overcast morning the blinds shaded against a glare that, to my eye, plainly wasn't there: a flat, bright grey sky, no direct sun, slats coming down anyway. My instinct, again, was to reach for the thresholds: widen the band, raise the bar, make it less twitchy on dull mornings. The pushback came before I could. Tuning the band was the wrong tool, the reasoning went; the problem wasn't *where* the threshold sat but that the system couldn't tell diffuse light from direct. A bright overcast sky pours out plenty of radiation. It just arrives scattered and directionless, none of it a beam aimed at the glass. The fix wasn't a better number; it was a second measurement that could distinguish the two.
+One overcast morning the blinds shaded against a glare that, to my eye, plainly wasn't there: a flat, bright grey sky, no direct sun, slats coming down anyway. My instinct, again, was to reach for the thresholds: widen the band, raise the bar, make it less twitchy on dull mornings. The pushback came before I could. Tuning the band was the wrong tool, the reasoning went; the problem wasn't _where_ the threshold sat but that the system couldn't tell diffuse light from direct. A bright overcast sky pours out plenty of radiation. It just arrives scattered and directionless, none of it a beam aimed at the glass. The fix wasn't a better number; it was a second measurement that could distinguish the two.
 
-The first proposal was to split the reading into direct and diffuse components and project only the direct part. Clean idea. And dead on arrival, because diffuse radiation wasn't among the values my station published in its live feed. So we looked at what *was* there and found something simpler: sunshine duration, the number of minutes in the last ten during which the sun shone strongly enough to cast a shadow. On a truly overcast morning that figure is zero, and zero is unambiguous. No direct sun in the last ten minutes means no glare to shade against, whatever the raw radiation number says.
+The first proposal was to split the reading into direct and diffuse components and project only the direct part. Clean idea. And dead on arrival, because diffuse radiation wasn't among the values my station published in its live feed. So we looked at what _was_ there and found something simpler: sunshine duration, the number of minutes in the last ten during which the sun shone strongly enough to cast a shadow. On a truly overcast morning that figure is zero, and zero is unambiguous. No direct sun in the last ten minutes means no glare to shade against, whatever the raw radiation number says.
 
 I suggested treating one minute or fewer the same as zero, a little slack, to be safe. It pushed back again, and was right to. One minute of sunshine in the official sense means a full sixty seconds of beam strong enough to throw a shadow: that's not noise, that's exactly the glare you'd want shaded. Zero had to mean zero. I'd reached for a fudge factor; the definition didn't allow one, and the line held.
 
 That was the version of the tool you hope for: the one that declines the easy knob and finds the real signal, the one that holds a definition against you when you're about to round it away. I had the other version too.
 
-The thresholds themselves had a quiet wobble. I was tuning them across few conversations, and I am not a building-physics expert. I didn't carry a correct number in my head to measure against. So when I came across a figure somewhere and pasted it in (*here's some data suggesting higher thresholds*), the system would take it and re-derive, agreeably, from there. The close-and-open pair went from 200 and 150, down to 150 and 100, back up to 250 and 150, each move sensible in isolation and each triggered by whatever I'd last fed it. The numbers didn't converge. They followed me around.
+The thresholds themselves had a quiet wobble. I was tuning them across few conversations, and I am not a building-physics expert. I didn't carry a correct number in my head to measure against. So when I came across a figure somewhere and pasted it in (_here's some data suggesting higher thresholds_), the system would take it and re-derive, agreeably, from there. The close-and-open pair went from 200 and 150, down to 150 and 100, back up to 250 and 150, each move sensible in isolation and each triggered by whatever I'd last fed it. The numbers didn't converge. They followed me around.
 
 The novice part of that is forgivable: without domain knowledge, I had no anchor of my own to stop the slide. The engineering part is not. I know better than to let a value be rebuilt from scratch every time a new fact arrives: you fix a baseline and test changes against it, you don't re-derive the baseline on each input. I'd applied exactly that discipline when I caught the missing tests. Here I didn't, and the reason I didn't is the uncomfortable one: the tool was so fluent at re-deriving that re-deriving felt like converging. Every turn produced a fresh, well-reasoned number, and a fresh well-reasoned number is hard to tell apart from progress. It wasn't pushing me off the anchor. It was making the absence of an anchor feel productive.
 
 Same tool, more than once. The sunshine-duration definition held because the number behind it was the official sixty-second threshold, not something I could round away. The thresholds wobbled because the only number behind them was whatever I'd typed in last. Claude pushes back hardest when you hand it a fixed point: a test, a measurement, a definition, a constraint from the real system. Without one, it stays fluent, and fluent is easy to mistake for right.
 
-___
+---
 
 ## What it's built on
 
-* [Federal Geoportal / Automatic weather stations](https://data.geo.admin.ch/browser/index.html#/collections/ch.meteoschweiz.ogd-smn)
-* [MeteoSwiss / Radiation monitoring](https://www.meteoswiss.admin.ch/climate/the-climate-of-switzerland/radiation-monitoring.html)
-* [GitHub / mslavov / shelly-forge](https://github.com/mslavov/shelly-forge)
-* [Vitest](https://vitest.dev/)
-* [GitHub / mourner / suncalc](https://github.com/mourner/suncalc)
-* [Shelly Gen 2+ Device API](https://shelly-api-docs.shelly.cloud/gen2)
-* [Shelly Knowledge Base / Shelly 2PM Gen3](https://kb.shelly.cloud/knowledge-base/shelly-2pm-gen3)
+- [Federal Geoportal / Automatic weather stations](https://data.geo.admin.ch/browser/index.html#/collections/ch.meteoschweiz.ogd-smn)
+- [MeteoSwiss / Radiation monitoring](https://www.meteoswiss.admin.ch/climate/the-climate-of-switzerland/radiation-monitoring.html)
+- [GitHub / mslavov / shelly-forge](https://github.com/mslavov/shelly-forge)
+- [Vitest](https://vitest.dev/)
+- [GitHub / mourner / suncalc](https://github.com/mourner/suncalc)
+- [Shelly Gen 2+ Device API](https://shelly-api-docs.shelly.cloud/gen2)
+- [Shelly Knowledge Base / Shelly 2PM Gen3](https://kb.shelly.cloud/knowledge-base/shelly-2pm-gen3)
