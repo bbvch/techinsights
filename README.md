@@ -4,15 +4,15 @@ A simple, engineer-driven technical blog (Docusaurus) for sharing posts, tutoria
 
 ## Requirements
 
-Install Node.js version 20.0 or above (which can be checked by running node -v). You can use nvm to manage multiple Node.js versions on a single machine.
+Install Node.js version 24.0 or above (which can be checked by running node -v). You can use nvm to manage multiple Node.js versions on a single machine.
 When installing Node.js, it is recommended to check all checkboxes related to dependencies.
 See for more details [docusaurus requirements](https://docusaurus.io/docs/installation#requirements)
 
 ## Quick start
 
-- Install dependencies: `npm install`
-- Run locally: `npm start`
-- Build: `npm run build`
+- Install dependencies: `pnpm install`
+- Run locally: `pnpm start`
+- Build: `pnpm run build`
 
 ## Contributing
 
