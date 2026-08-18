@@ -101,3 +101,14 @@ Quality Assurance:
 AI-Assisted Development:
   label: AI-Assisted Development
   permalink: /ai-assisted-development
+
+Java:
+  label: Java
+  permalink: /java
+'Release Management':
+  label: Release Management
+  permalink: /release-management
+
+'Custom Work Items':
+  label: Custom Work Items
+  permalink: /custom-work-items
