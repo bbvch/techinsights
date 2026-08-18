@@ -102,6 +102,9 @@ AI-Assisted Development:
   label: AI-Assisted Development
   permalink: /ai-assisted-development
 
+Java:
+  label: Java
+  permalink: /java
 'Release Management':
   label: Release Management
   permalink: /release-management
