@@ -14,6 +14,11 @@ See for more details [docusaurus requirements](https://docusaurus.io/docs/instal
 - Run locally: `npm start`
 - Build: `npm run build`
 
+## Search
+
+- Index pages locally: npm run build
+- Then start the app: npm run serve
+
 ## Contributing
 
 Please read the contribution guidelines: [CONTRIBUTING.md](CONTRIBUTING.md)
