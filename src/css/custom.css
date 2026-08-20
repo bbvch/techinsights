@@ -256,8 +256,12 @@ a:hover {
 
 /* Blog list paginator */
 .pagination-nav {
-  margin: 1rem 0 0 auto;
-  max-width: fit-content;
+  margin-top: 1rem;
+  display: flex;
+}
+
+.pagination-nav__link--next {
+  margin-left: auto;
 }
 
 .pagination-nav__link {
