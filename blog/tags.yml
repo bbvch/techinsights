@@ -1,14 +1,112 @@
-kubernetes:
-  label: Kubernetes
-  permalink: /kubernetes
+# Keep tags sorted alphabetically by key.
+
+agile:
+  label: Agile
+  permalink: /agile
+
+ai-assisted-development:
+  label: AI-Assisted Development
+  permalink: /ai-assisted-development
 
 architecture:
   label: Architecture
   permalink: /architecture
 
+architecture-testing:
+  label: Architecture Testing
+  permalink: /architecture-testing
+
+area-paths:
+  label: Area Paths
+  permalink: /area-paths
+
+azure-devops:
+  label: Azure DevOps
+  permalink: /azure-devops
+
 cloud-native:
   label: Cloud Native
   permalink: /cloud-native
+
+code-quality:
+  label: Code Quality
+  permalink: /code-quality
+
+conventional-commits:
+  label: Conventional Commits
+  permalink: /conventional-commits
+
+cpp:
+  label: C++
+  permalink: /cpp
+
+csharp:
+  label: C#
+  permalink: /csharp
+
+custom-work-items:
+  label: Custom Work Items
+  permalink: /custom-work-items
+
+devops:
+  label: DevOps
+  permalink: /devops
+
+git:
+  label: Git
+  permalink: /git
+
+iterations:
+  label: Iterations
+  permalink: /iterations
+
+java:
+  label: Java
+  permalink: /java
+
+kubernetes:
+  label: Kubernetes
+  permalink: /kubernetes
+
+pit-of-success:
+  label: Pit of Success
+  permalink: /pit-of-success
+
+project-structure:
+  label: Project Structure
+  permalink: /project-structure
+
+pull-requests:
+  label: Pull Requests
+  permalink: /pull-requests
+
+quality-assurance:
+  label: Quality Assurance
+  permalink: /quality-assurance
+
+release-management:
+  label: Release Management
+  permalink: /release-management
+
+rust:
+  label: Rust
+  permalink: /rust
+
+semver:
+  label: SemVer
+  permalink: /semver
+
+static-analysis:
+  label: Static Analysis
+  permalink: /static-analysis
+
+team-collaboration:
+  label: Team Collaboration
+  permalink: /team-collaboration
+
+team-configuration:
+  label: Team Configuration
+  permalink: /team-configuration
 
 testing:
   label: Testing
@@ -17,98 +115,3 @@ testing:
 well-architected:
   label: Well-Architected
   permalink: /well-architected
-
-Rust:
-  label: Rust
-  permalink: /rust
-
-'C++':
-  label: C++
-  permalink: /cpp
-
-'C#':
-  label: C#
-  permalink: /csharp
-
-'Azure DevOps':
-  label: Azure DevOps
-  permalink: /azure-devops
-
-'Project Structure':
-  label: Project Structure
-  permalink: /project-structure
-
-Agile:
-  label: Agile
-  permalink: /agile
-
-'Area Paths':
-  label: Area Paths
-  permalink: /area-paths
-
-Iterations:
-  label: Iterations
-  permalink: /iterations
-
-'Team Configuration':
-  label: Team Configuration
-  permalink: /team-configuration
-
-'Team Collaboration':
-  label: Team Collaboration
-  permalink: /team-collaboration
-
-code-quality:
-  label: code-quality
-  permalink: /code-quality
-
-static-analysis:
-  label: static-analysis
-  permalink: /static-analysis
-
-architecture-testing:
-  label: architecture-testing
-  permalink: /architecture-testing
-
-pit-of-success:
-  label: pit-of-success
-  permalink: /pit-of-success
-
-'Conventional Commits':
-  label: Conventional Commits
-  permalink: /conventional-commits
-
-SemVer:
-  label: SemVer
-  permalink: /semver
-
-Git:
-  label: Git
-  permalink: /git
-
-'Pull Requests':
-  label: Pull Requests
-  permalink: /pull-requests
-
-DevOps:
-  label: DevOps
-  permalink: /devops
-
-Quality Assurance:
-  label: Quality Assurance
-  permalink: /quality-assurance
-
-AI-Assisted Development:
-  label: AI-Assisted Development
-  permalink: /ai-assisted-development
-
-Java:
-  label: Java
-  permalink: /java
-'Release Management':
-  label: Release Management
-  permalink: /release-management
-
-'Custom Work Items':
-  label: Custom Work Items
-  permalink: /custom-work-items
