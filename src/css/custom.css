@@ -254,4 +254,20 @@ a:hover {
   text-decoration: underline;
 }
 
+/* Blog list paginator */
+.pagination-nav {
+  margin-top: 1rem;
+  display: flex;
+}
+
+.pagination-nav__link--next {
+  margin-left: auto;
+}
+
+.pagination-nav__link {
+  padding: 0.8rem 1.5rem;
+  font-size: 0.85rem;
+  border-width: 1px;
+}
+
 
