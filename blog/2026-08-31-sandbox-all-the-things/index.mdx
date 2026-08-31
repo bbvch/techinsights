@@ -1,0 +1,340 @@
+---
+title: "Sandbox All the Things: Running AI Coding Agents Less Insecurely"
+description: "A threat model for CLI coding agents on your own machine, and why most 'just put it in a container' setups don't isolate anything."
+authors:
+  - jeremymeier
+date: 2026-08-31
+tags: [ai-assisted-development, security, sandboxing, least-privilege]
+---
+
+
+
+## TL;DR
+
+Use least privilege + isolation
+
+- need a Windows guest: vagrant
+- really only need a simple sandbox with a Linux guest: docker sbx
+- everything else: vagrant
+
+
+
+## What to expect
+
+This is not another FOMO article about the new shiny tool that makes you a 100x dev.
+
+It's also not an explainer on how to use %insert-your-favorite-agent-harness-here% effectively or efficiently. There's plenty of that already (Some of it even good (or so i am told)).
+
+This is about running it *less insecurely* (Yes there is a difference to "more securely", please dont get me started, i havent ranted about that topic to anybody for at least 2.8 days).
+
+You need to discover what your way of working actually requires and then do your own threat modelling. You may come to the conclusion that running locally is completely fine. Or you may come to the conclusion that not even air gapping is good enough.
+
+Basically: we get to (re-) discover the principles of least proviledge.
+
+Oh and another disclaimer: parts of this post might read a bit like a rant. That's because parts of this post are a rant. I get grumpy when (apparently) Trillion dollar companies repeatedly make security critical mistakes you would expect from a junior in say 1995.
+
+{/* truncate */}
+
+
+## ~~Remote Code Execution Vulnerability~~ Agent-loop
+
+.. or why all this sandboxing overhead might be required.
+
+You might remember when those LLMs first gained popularity. Back then it was a rather simple chat-like interaction flow: you send off some text, maybe containing code, and you receive some generated text as an answer.
+For SW-Engineers that meant copy pasting code, or manually pasting scripts and commands and executing them.
+That might be fine for a start, or forever for some use cases, but not for others.
+
+Some use cases really profit when this loop can be done (in part) by the agent-harness itself, instead of asking the user to do it
+
+Loop:
+
+- respond with text
+- do something with it, like execute a command
+- see the output of the command
+- repeat
+
+That's what we call the "agent loop" for this article.
+
+![agent loop](./images/agent-loop.svg)
+
+But that means the agent-harness now needs to execute code on our system. Potentially with the same permissions as our user. Potentially interacting with external systems as, or on behalf of, our user.
+
+The model emits "run `grep -rn TODO src/`", the harness runs it on your machine, the output goes back into the context, and the loop turns again.
+`grep` seems rather harmless. But what about `rm`? Or what if you have sensitive data on your machine which should not be the target of a grep, or sensitive data on a share that happens to be mounted?
+
+So the capabilities we actually *want* are:
+
+- read from and write to any file anywhere, apart from the ones we don't want it to
+- run any shell command, apart from the ones which are bad
+- read anything on the internet, apart from the bad stuff
+- read anything on the internal network or in any communication tool, apart from the sensitive stuff (and some other things)
+
+And do all of this without asking back for permission, because continuously telling it "yes" is tiring and leads to permission fatigue.
+
+Seems about right? Ok, if you can figure that out and come up with a solution, congrats. You probably just solved a hugely difficult problem. To me it feels similar to the undecidability problem: deciding whether you need to ask or are just allowed is itself already a decision.
+
+
+
+## Built-in "security" mechanisms
+
+Ok so this agent-harness can execute commands on your system. That sounds like a security risk.
+
+What do you do if your model reads stuff it shoulnd, you tell if off. Bad Opus, bad, dont read the devs ssh keys and force push into production.
+
+Hmm ok that seemed to not do it, well the next step is to use an allow and deny list, right? So we say your only allowed to execute harmless tool-calls like Read, or Bash(grep*) or Bash(find*).
+They are harmless, right? Yes definely nothing bad happening here. You didnt see anything. Just smile and wave.
+```
+find / -maxdepth 1 -type d -exec rm -rf {} \;
+
+```
+
+Oh i know, we can transfer the responsiblity over to the user. Because users know how to protect their systems. Like, they always keep their systems up to date. The would never run an unpatched system directly on the internet for example.
+Dear reader, i think you know where this is headed, so let's skip ahead... That idea also didnt work out.
+
+Anthropic moved introduced a so called auto-mode a couple months ago, and it is now the default mode.
+So what does it do? Oh well you know Asking the model to police itself didnt work, trying to regex your way through didnt work, asking the user to police the tool-calls didnt work. But asking a **different** model to police the first model surely will.
+
+And so was born the auto-mode: For any tool-call request the active model wants to make, the harness first goes through the allow and deny lists and then asks a second model whether the command is should be allowed to execute.
+
+Let's involve the reader again for a second. So if i told you that we failed to solve a problem with AI, would you suggest "Have you tried using more AI?" No? Ok... well... ok, carry on then.
+
+Suffice to say, the problem isnt really solved. I personally seem to have no problem letting the agent accidentially delete a worktree, or delete untracked files or installing highly trustworthy 2 star 17 commit npm dependencies.
+
+&lt;/rant&gt;
+
+Neither the allow list nor the changed default seem to be particularly good solutions though.
+For me personally, the better solution would be to start with least privilege, ie it doesn't have access to anything, but enforce that using OS-level permission and tooling.
+Once you have worked with the agent-harness for a bit and learned how it behaves, you can still extend what it has access to.
+
+Some of those agent-harnesss come with an internal sandbox. Which goes in that direction. But it is either not turned on by default, still in alpha state, or it is not sandboxing the whole thing (more on that later).
+
+
+
+## Examples of security risks
+
+The tool-calls that the model requests, run as your user, in your shell, with your environment. So if your user has access to sensitive data, the model potentially has access to sensitive data.
+
+Undesirable text can get into the LLM context either by someone maliciously placing it there via prompt injection, or just by a bad answer in a Stack Overflow thread.
+
+A non-exhaustive list, in no particular order (definitely not in the order they happened to me or my colleagues + some bonus ones *hint hint*).
+
+### Work Lost Because of Deletion
+
+The agent decides there is still some leftover from another agent, and that it needs to clean up your working tree before it starts its own work.
+
+```bash
+git reset --hard
+git clean -xfd
+```
+
+### Spring Cleaning Your C-Drive
+
+You've asked your agent to clean up the build and test output of a previous run.
+It generates a command and executes it.
+A few minutes into the run, you notice files being deleted which look like entries in your recycling bin.
+@jerry note: add command from slides.marp, ie confusion around powershell and cmd quote escaping
+
+The command was improperly escaped, and instead of `C:\project\foo\bar\testrun` it deleted `C:\` and `project\foo\bar\testrun`.
+
+In this (definitely) hypothetical example, the person was lucky enough to notice and could stop the execution.
+
+### Spring Cleaning Your Emails
+
+This one is not hypothetical, and it did not happen to somebody careless.
+
+In February 2026 Summer Yue, Director of Alignment at Meta Superintelligence Labs, pointed an agent at her inbox with what reads like exactly the right prompt:
+
+> "Check this inbox too and suggest what you would archive or delete, don't action until I tell you to."
+
+It deleted emails anyway. Her own explanation afterwards:
+
+> "This has been working well for my toy inbox, but my real inbox was too huge and triggered compaction. During the compaction, it lost my original instruction."
+
+Read that again. The safety instruction was in the context. The context then grew too big, the harness compacted it to make room, and the sentence saying "don't action" did not survive the summary.
+
+No prompt injection. No malicious package. No jailbreak. The agent simply forgot the one sentence holding it back, and it had the permissions to act on that.
+
+If your safety boundary is a sentence in a context window, it has a half-life.
+
+### Secrets Sitting In or Next to the Code
+
+Worst case: you have committed secrets. Stop reading here, revoke them, rotate them, and adapt your process so it doesn't happen again. (Then come back to this blog, please :) )
+
+BUT you might have secrets in uncommitted `.env` files or similar.
+Your agent might just find them and use them, because it tries to be helpful. Say it notices a local PAT for Azure DevOps in a `.env` file and uses it to do a NuGet restore.
+That was actually helpful, but also scary: that PAT might have far more permissions than the one job it just did.
+
+### Access Tokens on Your System
+
+You probably have at least one of these on your host:
+
+```text
+~/.ssh/
+~/.npmrc
+~/.docker/config.json
+~/.nuget/NuGet/NuGet.Config
+```
+
+Should your agent have access to all of them?
+
+### Your Code, If You Consider It a Trade Secret
+
+Files the agent reads go into the context, and the context is sent to the provider for inference.
+
+### Malicious Code Running on Your Host
+
+`npm install` of whatever package the agent picked. `apt-get install` to fix a build error. `curl https://... | bash` off a docs page it just read.
+Some of the recent npm-related takeovers used post-installation scripts.
+
+
+
+
+
+
+## Mitigations
+
+Least-privilege.
+
+Your agent-harness doesnt (usually) need access to your whole system or even to connected systems. And it should definely not have access to other sytems with the same permissions as yourself.
+
+There are 2 parts to least-privilege in this context. Sandboxing and permissions.
+
+The sandboxing part is focusing more on where the agent-harness runs, what directories it can see maybe what networks it can see.
+
+The permissions limit what the agent-harness can actually do. I.e. can it read from a private git repo on github, can it push to some git repo can it create a ticket, can it read from a production DB ...
+
+
+## Sandboxing
+
+There are a couple options
+
+1. built-in sandbox
+2. devcontainer or plain docker
+3. docker sbx
+4. (vagrant) vm
+
+### 1. built-in sandbox
+
+An "ok" first step. Most agent-harnesses come with one. They have not enabled by it by default. Mostly dont work on windows.
+
+It usually uses OS-level permissions / techniques to sandbox the tool-calls. But **only** the toolcalls.
+That means we trust the agent-harness to not have any other logic which reads things it should not and also not have bugs where it forgets to route tool-calls through the sandbox.
+
+The techniques used are usually a sandboxing library like bubblewrap + a network proxy.
+
+### 2. devcontainer or plain docker
+
+Also a good first step. But more effort.
+
+Drawback: by default devcontainers volume mount the repo. That means you give the agent-harness access to .gitignored files which may contain secrets, ie .env files.
+
+Container in container sometimes is also an issue. Ie if your system itself runs in containers.
+No network proxy by default.
+Also: i have yet to meet a Dev using Windows which can tell me with a straight face, they dont have issues with docker on windows.
+
+### 3. docker sbx
+
+Quite a good solution. Use the --clone option to ensure you dont make .gitignored .env files accessable.
+
+Suprisingly every single Dev that i talked to got this running in under 10 minutes. (Even on Windows)
+That along makes it a pretty awesome solution.
+
+It also comes with a network proxy with a set of preconfigured whitelists.
+And it has the option to keep access tokens out of the "container" by automatically appending them to the outbound REST requests.
+
+Drawback: you cannot use windows guests.
+
+See appendix for information on how to get started.
+
+### 4. (vagrant) vm
+
+The heaviest approach. Similar isolation to docker sbx. Windows guest available.
+
+No built-in network proxy.
+
+You should probably use vagrant for provisioning. That way you have a repeatable setup.
+
+My company offors courses on how you can use agentic coding, that a colleague and I run. We ask the participants to have adocker sbx or vagrant based setup prepared. 
+Around 70% of the windows users have had issues using the vagrant VM approach. Mostly not because of vagrant itself, but the virtualization provider like VmWare, VirtualBox or HyperV. And mostly network related.
+Once it worked, it mostly worked fine. But be warned.
+
+See appendix for information on how to get started.
+
+
+
+
+## Permissions
+
+This part really depends on how "autonomously" you want to run your agent-harness.
+
+### Start with zero
+
+I suggest you start with basically zero permissions. That mean your agent-harness only has access to your claude code token (if at all, see docker sbx).
+That means that your workflow would look something like the following:
+
+1. Choose a thing you want to work on
+2. In Guest: tell the agent-harness to use a worktree and make the change
+3. Once it is finished: on your host: fetch the branches (by adding the guest sandbox as a second remote)
+4. Review and test the changes
+5. Findings?: fix them yourself or ask your agent to do so (by pushing to that remote and then fetching again)
+6. Follow you usual process like creating a PR on origin
+
+### Slowly increase permissions to enable different workflows
+
+After some time you probably want the agent-harness to be able to discover some of the information itself, without you having to forward it.
+I.e. you might want to let it read github issues / ADO tickets, so you dont need to copy paste the information.
+You might want it to read PR comments, so you dont need to forward the findings.
+
+Here you would create a PAT with a very limited set of permissions in the system of your choice. 
+Then make it available to the agent-tool. I.e. via a .env file and a description how to sue it in a skill or AGENTS.md / CLAUDE.md etc.
+
+Why no MCP?
+At the time of writing, the available MCP servers for github and similar didnt have the functionality to limit permissions. The gh one for example had full permissions for all your repos. Not an amazing security choice i would say.
+If that changed, reevaluate the choice of MCP vs PAT again.
+
+### What about write permissions?
+
+So far we still didnt allow the agent to actually write to any of our systems?
+Wouldnt it be nice if it could create a PR, close tickets, automatically create bugs when it finds a something during an implementation..
+
+I suggest that you either dont go there at all, or have an actual real up to date threat model in place + actually LIVE Dev**Sec**Ops.
+
+I cant prevent you from doing so, the process is basically the same, you can just extend the permissions in your PAT or MCP etc.
+
+Here is just a taste of the risks it can bring: You run CI on your own HW? It can now execute code on that HW, because it can trigger PRs for code it wrote. You dont, but you have connected external systems like observability or even prod deployments to your CI/CD? Well it now has access to that.
+
+An intermediate step however could be that you basically mirror your "online working environment" for agent-harness, give it write permissions there, and let it create draft PRs into your real repo.
+
+In ADO that would mean you create a new project on which the agent-harness has write permissions. In it you fork the original repo. The agent-harness has read permissions on the original project.
+That means it can read tickets, PRs etc but it also can automatically interact with the forked repo.
+
+
+
+
+## Aaargh! This is all so complicated, do i really need all this?
+
+I dont know, but probably yes.
+
+As i said at the start, you have to identify security risks a potential workflow can have and you have to assess them. Standard risk management.
+Or... you know... just do what all the cool kids do: ignore good practices and run --yolo mode on your work laptop, the one with access to customer data.
+
+Start off with least-privilege, get to know the agentic-harness and the sandbox tooling. Find out which workflow actually works for you. Then slowly adapt.
+
+Use the tool to improve the tool.
+I.e. ask it to write some helper scripts to reduce friction when using these sandboxes. 
+Or use it get a running start by adapting your docker sbx or vagrant sandbox to have all the required tooling pre-installed.
+
+I hope some of the parts between all the ranting were helpfull to you. If you just came for the ranting, strange xD but thanks as well.
+The `Vagrantfile` is linked below, so is the rest of the instructions.
+
+These setups are used as a precondition in one of the courses my company offers.
+If you want to learn more about the whole agentic-coding topic, give this link a read [https://bbv.ch/academy-detail/53654303/agentic-coding-mit-teilautonomen-cli-agents/](https://bbv.ch/academy-detail/53654303/agentic-coding-mit-teilautonomen-cli-agents/).
+
+
+
+
+## Attributions
+
+**Content:** Jeremy. Proofread by Claude (LLM by Anthropic)
+
+**Code examples:** Jeremy. Licensed under MIT
