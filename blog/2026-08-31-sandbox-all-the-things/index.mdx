@@ -232,10 +232,12 @@ Quite a good solution. Use the `--clone` option to ensure you don't make ignored
 Surprisingly, every single dev that i talked to got this running in under 10 minutes (even on Windows).
 That alone makes it a pretty awesome solution.
 
-It also ships with a network proxy and a set of preconfigured allow list.
+It also ships with a network proxy and a set of preconfigured allow lists.
 And it has the option to keep access tokens out of the "container" by automatically appending them to the outbound REST requests.
 
 Drawback: you cannot use Windows guests.
+
+See [the appendix](/sandbox-appendix#b-docker-sbx) for how to get started.
 
 #### 4. (vagrant) vm
 
@@ -249,7 +251,7 @@ My company offers courses on agentic coding, which a colleague and I run. We ask
 Around 70% of the Windows users have had issues with the vagrant VM approach. Mostly not because of vagrant itself, but because of the virtualization provider, like VMware, VirtualBox or Hyper-V. And mostly network-related.
 Once it worked, it mostly worked fine. But be warned.
 
-See appendix for information on how to get started.
+See [the appendix](/sandbox-appendix) for the setup instructions and both `Vagrantfile`s.
 
 ### Permissions
 
@@ -312,7 +314,7 @@ For example, ask it to write some helper scripts to reduce friction when using t
 Or use it to get a running start by adapting your docker sbx or vagrant sandbox to have all the required tooling pre-installed.
 
 I hope some of the parts between all the ranting were helpful to you. If you just came for the ranting, strange, but thanks as well.
-The `Vagrantfile` is linked below, and so are the instructions.
+Both `Vagrantfile`s and the setup instructions are in [the appendix](/sandbox-appendix).
 
 These setups are used as a precondition in one of the courses my company offers.
 If you want to learn more about the whole agentic-coding topic, give [the course description](https://bbv.ch/academy-detail/53654303/agentic-coding-mit-teilautonomen-cli-agents/) a read.

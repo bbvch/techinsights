@@ -1,0 +1,295 @@
+---
+title: "Appendix: sandbox setup"
+description: "Setup instructions and the two Vagrantfiles referenced by Sandbox All the Things."
+---
+
+# Appendix: sandbox setup
+
+The setup referenced from [Sandbox All the Things](/2026/08/31/sandbox-all-the-things). Reproduced here so the post is self-contained.
+---
+
+## Goal
+
+You have an isolated environment where your tool of choice runs. It will contain a copy of your source code and the minimum amount of secrets.
+
+We discussed the following two:
+
+- a) VM
+- b) docker sbx
+
+:::note
+
+If you need to have a windows environment you need to go with a).
+
+a) is the more difficult to set up initially.
+
+a) is the more flexible one. Both support pure "agentic coding". The VM approach enables scenarios like performance testing.
+
+:::
+
+## a) VM setup process
+
+This doc chooses the following approach:
+
+- vagrant to provision and interact with a VM, default 32 GB RAM and 8 CPUs
+- an Ubuntu based VM
+- git to facilitate code exchange `host <-> vm` via git remotes
+- claude (or similar) already preinstalled on the vm
+- ssh to get to the VM and use a cli agent there
+
+### One time setup
+
+#### Linux -> VirtualBox Linux VM
+
+0. host: install virtualbox. If you want/need a different virtualization, you need to adapt the vagrant file
+1. host: install vagrant (`https://releases.hashicorp.com/vagrant/2.4.9/vagrant_2.4.9_linux_amd64.zip`)
+2. host: `vagrant up` in vagrant file folder, then choose your CLI tool during provisioning
+3. host: append output of `vagrant ssh-config` to `~/.ssh/config` and set your vagrant VM alias to something memorable like vagrant_claude (The name at the end of the first line, starting with "Host")
+4. host: consider cleaning your git repo (`git clean`), then copy your source files to the VM: `scp ~/your_repo vagrant_claude:/home/vagrant/coding/`
+5. host: setup git upstream to vagrant in repo: `git remote add vagrant_claude vagrant_claude:/home/vagrant/coding/your_repo`
+6. host: `ssh (your vagrant VM alias from SSH config)` to guest
+7. guest: remove real remote from git repo: `git remote remove origin`
+8. guest: start your CLI tool and authenticate
+
+#### Windows -> Hyper-V Linux VM
+
+0. host: enable Hyper-V
+1. host: install vagrant (`https://releases.hashicorp.com/vagrant/2.4.9/vagrant_2.4.9_windows_amd64.msi`)
+2. host: `vagrant up` in vagrant file folder, then choose your CLI tool during provisioning
+3. host: append output of `vagrant ssh-config` to `%USERPROFILE%/.ssh/config` and set your vagrant VM alias to something memorable like vagrant_claude (The name at the end of the first line, starting with "Host")
+4. host: consider cleaning your git repo (`git clean`), then copy your source files to the VM: `scp c:\somewhere\your_repo vagrant_claude:/home/vagrant/coding/`
+5. host: setup git upstream to vagrant in repo: `git remote add vagrant_claude vagrant_claude:/home/vagrant/coding/your_repo`
+6. host: `ssh (your vagrant VM alias from SSH config)` to guest
+7. guest: remove real remote from git repo: `git remote remove origin`
+8. guest: start your CLI tool and authenticate
+
+With Hyper-V you might have issues with not getting an IP. 
+A possible solution is to create a bridge (pwsh: New-VMSwitch) and use that in config.vm.network.
+
+
+### For reference: ssh config example, Linux -> VirtualBox Linux VM
+
+On a linux host: `~/.ssh/config`
+
+On a windows host: `%USERPROFILE%/.ssh/config`
+
+```text
+Host vagrant_claude
+  HostName 127.0.0.1
+  User vagrant
+  Port 2201
+  UserKnownHostsFile /dev/null
+  StrictHostKeyChecking no
+  PasswordAuthentication no
+  IdentityFile /path-to-your-vagrant-file/.vagrant/machines/default/virtualbox/private_key
+  IdentitiesOnly yes
+  LogLevel FATAL
+  PubkeyAcceptedKeyTypes +ssh-rsa
+  HostKeyAlgorithms +ssh-rsa
+```
+
+## b) docker sbx
+
+You will need to have a docker account to use docker sbx. But docker sbx is free to use.
+
+Follow [the docker sbx getting started guide](https://docs.docker.com/ai/sandboxes/#get-started) to install it.
+
+Do NOT use plain `sbx run claude` but use `sbx run --clone claude`.
+
+The plain version will create a "container" (we will look at the exact way it works in the academy) and volume mount your directory to it.
+That approach still has the issue of making non-committed files (like secrets in `.env` files) within the repo available to your ai tool.
+`--clone` will set your "host" as the git remote in your "container", so it really only has access to committed files.
+
+---
+
+## `Vagrantfile` for Linux hosts
+
+VirtualBox provider.
+
+```ruby
+require "yaml"
+require "fileutils"
+
+vm_name = File.basename(Dir.getwd)
+
+CHOICES_FILE = File.join(File.dirname(__FILE__), ".vagrant", "install-choices.yml")
+
+def ask?(question)
+  print "#{question} [y/N]: "
+  %w[y yes].include?($stdin.gets&.strip&.downcase)
+end
+
+def load_or_ask_choices
+  # Already decided once → reuse, never ask again.
+  return YAML.load_file(CHOICES_FILE) if File.exist?(CHOICES_FILE)
+
+  # Only the provisioning commands should prompt; halt/destroy/ssh/status must not.
+  defaults = {
+    "claude" => false,
+    "dotnet" => false,
+    "codex" => false
+  }
+
+  provisioning = %w[up provision reload].include?(ARGV[0])
+
+  return defaults unless provisioning
+
+  choices = {
+    "claude" => ask?("Install claude?"),
+    "dotnet" => ask?("Install dotnet?"),
+    "codex" => ask?("Install codex?")
+  }
+
+  FileUtils.mkdir_p(File.dirname(CHOICES_FILE))
+  File.write(CHOICES_FILE, choices.to_yaml)
+  choices
+end
+
+choices = load_or_ask_choices
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "bento/ubuntu-24.04"
+
+  config.vm.network "forwarded_port", guest: 22, host: 2203, id: "ssh", auto_correct: false
+
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.memory = "32768"
+    vb.cpus = 8
+    vb.gui = false
+    vb.name = vm_name
+    vb.customize ["modifyvm", :id, "--audio", "none"]
+    vb.customize ["modifyvm", :id, "--usb", "off"]
+  end
+
+  # Root-level setup
+  config.vm.provision "shell",
+    inline: <<-SHELL
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -y docker.io nodejs npm git unzip bash-completion
+    usermod -aG docker vagrant
+  SHELL
+
+  # Per-user installs — runs as 'vagrant', so $HOME = /home/vagrant
+  config.vm.provision "shell",
+    privileged: false,
+    env: {
+      "INSTALL_CLAUDE" => choices["claude"].to_s,
+      "INSTALL_DOTNET" => choices["dotnet"].to_s,
+      "INSTALL_CODEX" => choices["codex"].to_s
+    },
+    inline: <<-SHELL
+    if [ "$INSTALL_CLAUDE" = "true" ]; then
+      curl -fsSL https://claude.ai/install.sh | bash
+      echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+    fi
+
+    if [ "$INSTALL_DOTNET" = "true" ]; then
+      curl -fsSL https://dot.net/v1/dotnet-install.sh | bash
+      echo 'export PATH="$HOME/.dotnet:$PATH"' >> ~/.bashrc
+    fi
+
+    if [ "$INSTALL_CODEX" = "true" ]; then
+      curl -fsSL https://chatgpt.com/codex/install.sh | bash
+    fi
+  SHELL
+
+end
+```
+
+## `Vagrantfile` for Windows hosts
+
+Hyper-V provider.
+
+```ruby
+require "yaml"
+require "fileutils"
+
+vm_name = File.basename(Dir.getwd)
+
+CHOICES_FILE = File.join(File.dirname(__FILE__), ".vagrant", "install-choices.yml")
+
+def ask?(question)
+  print "#{question} [y/N]: "
+  %w[y yes].include?($stdin.gets&.strip&.downcase)
+end
+
+def load_or_ask_choices
+  # Already decided once → reuse, never ask again.
+  return YAML.load_file(CHOICES_FILE) if File.exist?(CHOICES_FILE)
+
+  # Only the provisioning commands should prompt; halt/destroy/ssh/status must not.
+  defaults = {
+    "claude" => false,
+    "dotnet" => false,
+    "codex" => false
+  }
+
+  provisioning = %w[up provision reload].include?(ARGV[0])
+  return defaults unless provisioning
+
+  choices = {
+    "claude" => ask?("Install claude?"),
+    "dotnet" => ask?("Install dotnet?"),
+    "codex" => ask?("Install codex?")
+  }
+
+  FileUtils.mkdir_p(File.dirname(CHOICES_FILE))
+  File.write(CHOICES_FILE, choices.to_yaml)
+
+  choices
+end
+
+choices = load_or_ask_choices
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "gusztavvargadr/ubuntu-desktop-2404-lts"
+
+  config.vm.network "public_network"
+
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+
+  config.vm.provider "hyperv" do |hv|
+    hv.vmname = vm_name
+    hv.memory = 32768
+    hv.cpus = 8
+  end
+
+  # Root-level setup
+  config.vm.provision "shell",
+    inline: <<-SHELL
+      export DEBIAN_FRONTEND=noninteractive
+      apt-get update
+      apt-get install -y docker.io nodejs npm git unzip bash-completion curl
+      usermod -aG docker vagrant
+    SHELL
+
+  # Per-user installs — runs as 'vagrant', so $HOME = /home/vagrant
+  config.vm.provision "shell",
+    privileged: false,
+    env: {
+      "INSTALL_CLAUDE" => choices["claude"].to_s,
+      "INSTALL_DOTNET" => choices["dotnet"].to_s,
+      "INSTALL_CODEX" => choices["codex"].to_s
+    },
+    inline: <<-SHELL
+      if [ "$INSTALL_CLAUDE" = "true" ]; then
+        curl -fsSL https://claude.ai/install.sh | bash
+        echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+      fi
+
+      if [ "$INSTALL_DOTNET" = "true" ]; then
+        curl -fsSL https://dot.net/v1/dotnet-install.sh | bash
+        echo 'export PATH="$HOME/.dotnet:$PATH"' >> ~/.bashrc
+      fi
+
+      if [ "$INSTALL_CODEX" = "true" ]; then
+        curl -fsSL https://chatgpt.com/codex/install.sh | bash
+      fi
+    SHELL
+end
+```
+
+---
