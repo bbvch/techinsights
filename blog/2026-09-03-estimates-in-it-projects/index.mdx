@@ -1,0 +1,146 @@
+---
+title: "You Can't Estimate Chaos — But You Can Contract Around It"
+description: "Matching contracts to the real nature of software work."
+authors:
+  - vanescoboehm
+tags: [estimation, project-management, contracts, agile, cynefin]
+image: ./images/estimates-for-it-work.png
+date: 2026-09-03
+---
+
+import CenteredImage from '@site/src/components/Image';
+
+Six weeks into a fixed-price project, the burn rate is already outrunning delivered value. The estimate was reasonable, the requirements were signed off, and the team started well. Then reality intervened: a "minor clarification" from the customer turned out to touch three modules instead of one. A dependency that looked like a two-day integration took two weeks because the third-party API didn't behave anything like its documentation. A supposedly settled requirement reopened after a missing stakeholder saw the first demo. None of these events, on its own, looks like a crisis. Together, they produce the change request nobody wanted and the budget increase nobody planned for.
+
+{/* truncate */}
+
+If this sounds familiar, it's not because your team estimates badly. The problem is that the software industry keeps trying to solve a classification problem — deciding what **kind** of work this is before pricing it — with better arithmetic.
+
+Waterfall tried to solve it with sequence: analyze everything, then design, then build, so that nothing would be estimated before it was understood. It didn't work, because the very first assumption, that requirements could be fully understood before any code existed, was usually wrong. 
+
+Agile tried to solve it with iteration: build a little, show it, learn, adjust, so that misunderstandings surface in weeks instead of months. That is a genuine improvement. The blast radius of a misclassified requirement shrinks dramatically when you discover it in sprint two rather than at final acceptance. But Agile reduced the cost of getting the classification wrong. It didn't remove the classification step. Anyone who has run a refinement session knows the underlying difficulty is still there, relocated into the team, into the sprint, into the conversation between developer and product owner that now has to carry weight that used to rest with a requirements analyst.
+
+That classification gap is the real subject of this article: not how to estimate better, and not whether to estimate at all, but *why do some projects estimate just fine, while others blow their budget no matter how carefully the team plans?* The answer has less to do with skill and more to do with classification. Every task you estimate is implicitly a bet on what *kind* of problem it is. Is it routine work your team has done a dozen times? Does it need a specialist? Will its real shape only become clear once you're deep in the code? Or is it already on fire? Get the classification right, and even a hard estimate is honest work. Get it wrong, and no amount of buffer, diligence, or goodwill will save the number.
+
+That leaves the question every consultant eventually has to answer to a client holding a fixed budget: **if some work genuinely can't be estimated up front, how do you reconcile that with a customer who has to plan a fixed cost?** This article doesn't pretend that tension dissolves. The answer is not a smarter number, but matching the contract to the kind of problem you're actually solving, and building in mechanisms like start criteria, explicit buffers, a documented decision log, that keep an honest estimate usable once reality starts pushing back on it.
+
+The diagnostic concepts here are not new. The planning fallacy, the cone of uncertainty, #NoEstimates, Parkinson's Law, and the student syndrome all explain parts of the problem. People are systematically over-optimistic about their own plans. Early estimates carry a wide realistic range that only narrows as decisions get made. Point estimates can be replaced with probabilistic forecasts from historical throughput. And any safety margin quietly evaporates or gets filled regardless of how generous it was. But they share a common assumption: the estimate itself is the thing to fix. What they don't explain is why some estimates stay reliable — teams quote a number and land close to it — while others collapse despite the same level of care, experience, and buffer. That asymmetry is the real puzzle, and it suggests the failure isn't in the arithmetic at all. It's upstream of it, in a judgment that's rarely examined explicitly: what kind of problem is this, actually? What is less common is using that classification to choose the *contract*, not just the process.
+
+## A different lens: estimating is a bet on what kind of problem you have
+
+There's a simple way to sort work that most estimation discussions skip past, and it comes from decision-making theory rather than software engineering: the **Cynefin framework**, developed by Dave Snowden. Cynefin distinguishes problems by how knowable the relationship between cause and effect is, and names four domains that matter here. Some problems are so routine that the right response is obvious and repeatable, e.g. a known bug with a known fix or a form that follows a pattern the team has built a dozen times. Cynefin calls this the **clear** domain. One level up, a problem may still have a knowable answer, but only an expert can find it. Examples for that are a performance bottleneck that requires profiling against a known architecture, or implementing a payment flow against a well-documented, stable API. This is the **complicated** domain, and it's exactly what most estimation techniques were built for: enough structure exists that decomposing the work and adding up the pieces is a meaningful exercise.
+
+Then there's the **complex** domain, where the relationship between cause and effect only becomes visible in hindsight, e.g. an architecture decision for a genuinely new problem or a feature whose success depends on user behavior nobody can fully predict in advance. No amount of upfront analysis substitutes for building something small, observing what happens, and adjusting. And finally there's the **chaotic** domain, where, at least at first, no stable relationship between cause and effect exists at all:
+conflicting stakeholders, a requirement that changes depending on who you last spoke to, a dependency nobody has mapped. The only sane first move here is to create enough order and agreement that the problem becomes analyzable and not to estimate it.
+
+These domains are not permanent labels attached to a task. The same piece of work can shift between domains as understanding, constraints, or stakeholders change. A requirement that was clear can turn complex the moment a new stakeholder disagrees with it. A complex integration can become complicated once the first working version proves the approach. That fluidity is exactly what makes misclassification so easy to miss: a block of work that has always been treated as clear or complicated can drift into complex or chaotic territory unnoticed, until a routine assumption turns out not to hold. Most upfront, decomposition-based estimation techniques work best in the clear and complicated domains. Applied to complex or chaotic problems, they don't merely become inaccurate. They become misleadingly precise.
+
+## Three ways the estimate stops matching the work
+
+Strip away the specifics of any individual project, and most fixed-price overruns trace back to one of three recurring mechanisms — each one a version of pricing an unknown as if it were already known.
+
+**Unknowns priced as knowns.** Requirements are rarely handed over complete. They get sharpened through back-and-forth as the customer sees something concrete and reacts to it. That's normal and, done well, even efficient. But it means a "finalized" requirement early on is often only finalized in the sense that nobody has challenged it yet. Every clarification that arrives after the estimate was fixed is a small piece of complex-domain work masquerading, at signing time, as complicated-domain work. The same mechanism shows up on the technical side: a task that looks like routine integration turns out to depend on an external system whose real behavior nobody had reason to doubt until someone tried it. Both cases are the same error wearing a different costume: treating something whose shape is still being learned as if its shape were already known.
+
+**Coordination that produces motion but no decisions.** Some of the most expensive delay in a project has nothing to do with writing code. A status meeting revisits the same open question for the third week running, because whatever would resolve it — a decision, a missing piece of context, an owner willing to commit — still hasn't shown up. This isn't a complicated problem waiting for more analysis; it's a chaotic one, in the sense that no amount of discussion moves it forward until someone acts to create
+enough order for a decision to actually stick. Treating it as something to keep analyzing, rather than something to resolve by decree, is exactly how a project loses weeks "one day at a time" without anyone being able to point to a single dramatic cause.
+
+**Decisions that don't stay decided.** The previous mechanism describes a decision that never arrives. This one describes a decision that does arrive — and then doesn't hold. Sign-off gets delayed because the person who could give it isn't clearly assigned. Development starts anyway on a best-guess version, because the capacity was booked and sitting idle costs money too. And then, worse than a requirement that was never settled, a requirement everyone believed was settled gets reopened once a stakeholder who wasn't in the original conversation finally sees the result. Each of these events quietly resets the part of the estimate that assumed requirements would hold still — and because it happens gradually, the project rarely notices the estimate has become fiction until the budget says so.
+
+A fourth factor cuts across all three: the assumption that work hours are fungible. They are not. If the one person who understands the legacy system goes on leave, the remaining team doesn't just work slower — they may produce work that has to be redone when the expert returns. Estimation techniques that treat the team as interchangeable capacity are making a hidden assumption about the actors, not just the task. In Cynefin terms, the same problem can be complicated for one team and complex for another, depending on who is in the room.
+
+All three mechanisms share the same shape: work that belongs in the complex or chaotic domain gets carried on a budget and schedule built for the complicated one. The following sections spell out what changes once that distinction is made explicit: how the work gets classified, priced, started, and revisited.
+
+## Diagnosing the domain before quoting a price
+
+Classifying the domain is a deliberate step, not an afterthought during scoping. The table below lists the key questions to answer before any number is quoted. Each red flag is a reason to reconsider a fixed-price contract. Multiple flags point firmly toward complex or chaotic territory.
+
+| Question                                                                                             | Red Flag Indication     | Practical Check                                                                                                                                                      |
+| ---------------------------------------------------------------------------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Has this exact kind of work been done before, by this team?                                          | No → Complex            | Review past project retrospectives. Ask the proposed team directly in scoping.                                                                                       |
+| Are the requirements stable enough to survive the next few weeks unchanged?                          | No → Complex / Chaotic  | Ask the client: "Who else will see this for the first time after sign-off?" If the answer is "the board" or "the end users," stability is unlikely.                  |
+| Is there one identifiable decision-maker with authority to commit without further escalation?        | No → Chaotic            | Ask: "If we need a yes/no answer by Friday, who gives it?" If the answer requires a meeting to determine, you don't have one.                                        |
+| Are all technical dependencies enumerated and verified?                                              | No → Complex / Chaotic  | Request a dependency list from the client's architecture team. If none exists, that is itself a red flag.                                                            |
+| Are there legal, security, or organizational unknowns still open?                                    | Yes → Complex / Chaotic | Ask the client's compliance or security team directly. Check whether a Data Protection Impact Assessment, penetration test, or regulatory approval is still pending. |
+| Can the full scope be frozen at contract signature?                                                  | No → Complex            | Ask: "What happens if a stakeholder sees the first demo and wants changes?" If the answer is "we'll discuss it," scope cannot be frozen.                             |
+| Must the approach be validated through working code before the solution is known?                    | Yes → Complex           | Ask: "Can we specify the solution in a document, or do we need to build a spike to know if it works?"                                                                |
+| Have all stakeholders who will review or approve the result been identified and involved in scoping? | No → Complex / Chaotic  | Map the approval chain explicitly. Any missing approver is a future change request.                                                                                  |
+
+Where no flag is raised, a fixed price is a reasonable instrument. A single flag warrants explicit scaffolding. More than one flag points to a domain where a fixed-price contract will not hold.
+
+The diagnostic questions are a snapshot, not a guarantee. A classification made in good faith can still be overturned by a late-arriving stakeholder or a newly discovered constraint. The re-estimation triggers at the end of this article exist precisely for that case: they make the reclassification an expected event rather than a failure to explain.
+
+## Matching the contract to the domain
+
+Each domain has a contract pattern that fits it. Using the wrong one doesn't just produce a bad estimate. It produces a contract that cannot absorb the kind of change the work will generate.
+
+**Clear.** Fixed price is straightforward. The scope is repeatable, and cost is calculated directly from comparable past work.
+
+**Complicated.** Fixed price remains viable, but only with explicit scaffolding: a bounded scope, documented technical assumptions, an agreed change-request process, an independent review of the estimate, and dependencies that are listed rather than assumed.
+
+**Complex.** A single fixed price asks the client to accept a bet they cannot evaluate. Workable alternatives include a paid discovery phase before any commitment, time-and-materials, capped time-and-materials, target cost with shared risk between client and vendor (both parties agree on a budget ceiling and split savings or overruns proportionally — a gain-share/pain-share model), scope control through iteration (the client commits a fixed budget per iteration and re-prioritises scope each cycle, so cost is fixed but scope flexes), or a budget with defined options. Milestones in this domain function as decision points, not delivery guarantees. Range estimation and aggregate buffers can work for complex-domain portfolios when the task count is large and the tasks are sufficiently similar that individual errors cancel out — dozens of comparable user stories, for instance, rather than three unique integrations. The real failure mode is the opposite case: a small number of heterogeneous tasks where the unknowns are correlated, a single unresolved dependency invalidates multiple estimates, or the task count is too low for variance to average out. In those situations, a buffer cannot substitute for a contract structure that absorbs change.
+
+**Chaotic.** No fixed-scope contract applies yet, but the stabilization work itself has a cost and needs a vehicle. In practice this is billed as a short time-and-materials engagement or a paid discovery sprint with a defined timebox. Within that engagement: identify a decision-maker, stabilize the immediate conflict, freeze or narrow the scope — then reclassify the work into one of the other three domains and price it properly from there. This is not a return to the waterfall design phase. The stabilization sprint is deliberately short (one to three weeks), produces no implementation, and has a single exit criterion: enough order to reclassify the work into a domain where a real estimate is possible. If the engagement cannot reach that threshold within the timebox, the honest answer is that the work is not yet contractible, and the client should be told so.
+
+## Starting only when the commitment has a basis
+
+An estimate made before a set of minimal conditions are met is not yet an operational commitment, regardless of how it was calculated. Conditions worth requiring before work starts include:
+
+- A decision-maker is named and has the authority to approve or reject changes.
+- Requirements are defined at least in terms of goals and explicit exclusions.
+- Technical integrations have been investigated, not assumed.
+- Dependencies are known, or explicitly recorded as a risk.
+- Assumptions underlying the estimate are documented.
+- A change process is agreed upon.
+- Budget authority and decision logic are clarified.
+- A first delivery or learning cycle is defined.
+
+Conditions like the change process, budget authority and the named decision-maker are contractual in nature and belong in the agreement itself, not in a project wiki. Others are operational prerequisites that the delivery team verifies before writing the first line of code.
+
+The harder case is when capacity has already been reserved and these conditions are still unmet by the date the team was due to start. Leaving that ambiguous is how projects end up delivering against requirements nobody signed off on. A cleaner approach fixes the fallback in advance, tied to a drop-dead date: freeze the scope on the assumptions documented so far, convert the affected slice to time-and-materials, reallocate the reserved capacity elsewhere, or run a short, timeboxed discovery spike
+to close the gap. Which option applies should be agreed before the date arrives, not negotiated after it.
+
+## Buffers that are managed, not hidden
+
+Safety margin folded into individual task estimates tends to evaporate: work expands to consume whatever time it is given, and any slack invites deferral until the deadline is close. Reserves are more reliable when they are removed from individual tasks and consolidated into a single, visible project buffer that is tracked and consumed transparently, rather than distributed invisibly across a list of estimates. The
+size of that buffer should scale with domain: complicated work needs a modest allowance for expert rework; complex work needs a substantially larger one, sized against the discovery phase rather than guessed at the outset.
+
+## A written basis for later conversations
+
+Verbal agreements are the first thing that gets disputed once a project runs over budget. A small set of written records keeps that dispute short:
+
+- **Assumption log** — what the estimate assumed to be true, and what would invalidate it.
+- **Decision log** — what was decided, by whom, and when.
+- **Change log** — what changes were requested, how they were assessed, and whether they were accepted.
+- **Risk register** — known risks and the buffer allocated against each.
+- **Escalation path** — what happens, and by when, if a decision is blocked.
+
+None of these need to be elaborate. Their value is in existing at all: a change request is easy to justify when it points at a dated entry in a log, and difficult to justify from memory alone. These records are most valuable when they are kept collaboratively and reviewed jointly. A shared assumption log discussed in a fortnightly check-in prevents disputes far more reliably than a log produced unilaterally and brandished after the fact. If the first time a client sees the assumption log is in a change-request dispute, the log has already failed at its primary purpose.
+
+## When an estimate needs to be revisited
+
+An estimate is a statement about a specific set of assumptions, not a permanent fact. Any of the following should trigger a re-estimation rather than a silent adjustment to the schedule:
+
+- A documented assumption turns out not to hold.
+- A previously unknown dependency is discovered.
+- A requirement changes materially from what was estimated.
+- A stakeholder contests a requirement that was previously confirmed.
+- An integration takes materially longer than the estimate assumed.
+- A decision remains blocked beyond an agreed threshold.
+
+Treating these as routine triggers, rather than as failures to explain after the fact, is what keeps an estimate usable for the duration of a project instead of only at its start.
+
+## Bottom line
+
+The contract type must fit the domain. The domain does not adjust itself to fit the contract. The diagnostic questions, the contract patterns, the start criteria, the buffer, the logs, and the re-estimation triggers above all implement that one distinction operationally: match the pricing model to the kind of problem actually being estimated, then build in the mechanisms that keep that match honest as the work proceeds.
+
+None of this removes the underlying uncertainty of complex or chaotic work. What changes is whether that uncertainty is priced into arithmetic or into the contract structure. A project that gets this distinction right can still run into surprises — but it spends its time solving them, rather than explaining, after the fact, why a number that was never going to hold has failed to hold.
+
+## Further Reading
+
+- [**A Leader's Framework for Decision Making** — David Snowden and Mary Boone's original *Harvard Business Review* article introducing the Cynefin framework and its problem domains.](https://hbr.org/2007/11/a-leaders-framework-for-decision-making)
+- [**About the Cynefin Framework** — The Cynefin Co's own overview of the framework and how sense-making differs from best-practice thinking.](https://thecynefin.co/about-us/about-cynefin-framework/)
+- [**Delusions of Success: How Optimism Undermines Executives' Decisions** — Dan Lovallo and Daniel Kahneman's *Harvard Business Review* article on the planning fallacy and why forecasts should be built from outside-view reference classes rather than inside-view detail.](https://hbr.org/2003/07/delusions-of-success-how-optimism-undermines-executives-decisions)
+- [**The Cone of Uncertainty** — Steve McConnell (Construx) on why estimate accuracy only narrows as a project proceeds, and why a single number quoted at the start is inherently unreliable.](https://www.construx.com/books/the-cone-of-uncertainty/)
+- [**Green Book Supplementary Guidance: Optimism Bias** — HM Treasury's official guidance requiring cost and schedule estimates to be corrected against outturn data from comparable past projects.](https://www.gov.uk/government/publications/green-book-supplementary-guidance-optimism-bias)
+- [**#NoEstimates** — The movement's home page, questioning whether upfront estimation is the right tool for tracking and forecasting software delivery.](https://www.noestimates.org)
+- [**FixedPrice** — Martin Fowler on why a fixed-price agile contract has to fix budget and date while leaving scope negotiable, rather than fixing all three.](https://martinfowler.com/bliki/FixedPrice.html)
