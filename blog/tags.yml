@@ -68,6 +68,10 @@ kubernetes:
   label: Kubernetes
   permalink: /kubernetes
 
+least-privilege:
+  label: Least Privilege
+  permalink: /least-privilege
+
 pit-of-success:
   label: Pit of Success
   permalink: /pit-of-success
@@ -92,6 +96,14 @@ rust:
   label: Rust
   permalink: /rust
 
+sandboxing:
+  label: Sandboxing
+  permalink: /sandboxing
+
+security:
+  label: Security
+  permalink: /security
+
 semver:
   label: SemVer
   permalink: /semver
@@ -111,6 +123,10 @@ team-configuration:
 testing:
   label: Testing
   permalink: /testing
+
+threat-modelling:
+  label: Threat Modelling
+  permalink: /threat-modelling
 
 well-architected:
   label: Well-Architected
