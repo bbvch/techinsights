@@ -32,6 +32,10 @@ code-quality:
   label: Code Quality
   permalink: /code-quality
 
+contracts:
+  label: Contracts
+  permalink: /contracts
+
 conventional-commits:
   label: Conventional Commits
   permalink: /conventional-commits
@@ -48,9 +52,17 @@ custom-work-items:
   label: Custom Work Items
   permalink: /custom-work-items
 
+cynefin:
+  label: Cynefin
+  permalink: /cynefin
+
 devops:
   label: DevOps
   permalink: /devops
+
+estimation:
+  label: Estimation
+  permalink: /estimation
 
 git:
   label: Git
@@ -71,6 +83,10 @@ kubernetes:
 pit-of-success:
   label: Pit of Success
   permalink: /pit-of-success
+
+project-management:
+  label: Project Management
+  permalink: /project-management
 
 project-structure:
   label: Project Structure
