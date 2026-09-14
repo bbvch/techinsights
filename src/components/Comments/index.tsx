@@ -2,7 +2,7 @@ import React from "react";
 import Giscus from "@giscus/react";
 import { useColorMode } from "@docusaurus/theme-common";
 
-export default function Comments(): JSX.Element {
+export default function Comments(): React.JSX.Element {
   const { colorMode } = useColorMode();
 
   return (
