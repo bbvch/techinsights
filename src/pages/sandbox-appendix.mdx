@@ -96,7 +96,7 @@ Follow [the docker sbx getting started guide](https://docs.docker.com/ai/sandbox
 
 Do NOT use plain `sbx run claude` but use `sbx run --clone claude`.
 
-The plain version will create a "container" (we will look at the exact way it works in the academy) and volume mount your directory to it.
+The plain version will create a "container" (we look at the exact way it works in the academy) and volume mount your directory to it.
 That approach still has the issue of making non-committed files (like secrets in `.env` files) within the repo available to your ai tool.
 `--clone` will set your "host" as the git remote in your "container", so it really only has access to committed files.
 
