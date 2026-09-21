@@ -98,7 +98,32 @@ Do NOT use plain `sbx run claude` but use `sbx run --clone claude`.
 
 The plain version will create a "container" (we look at the exact way it works in the academy) and volume mount your directory to it.
 That approach still has the issue of making non-committed files (like secrets in `.env` files) within the repo available to your ai tool.
-`--clone` will set your "host" as the git remote in your "container", so it really only has access to committed files.
+~~`--clone` will set your "host" as the git remote in your "container", so it really only has access to committed files.~~
+
+:::warning[Update]
+
+The struck-through sentence is no longer true.
+
+Clone mode now additionally mounts the hosts repository read-only into the sandbox at /run/sandbox/source. 
+It was reported as a bug, but closed by docker by prioritizing developer experience over isolation. 
+
+-> do not use --clone if you have .env files that the agent should not see.
+
+To actually get the old guarantee back you to use a mountless sandbox like so:
+
+```bash
+sbx create --name yourSandboxName claude # or use your ai tool of choice
+sbx run --name yourSandboxName
+```
+
+And then follow a similar approach to the vagrant section on how to get the git repo setup. But use ssh from sbx instead:
+```bash
+sbx setup ssh # to be able to use sbx as a ssh git remote
+git remote add sbx yourSandboxName.sbx:/home/agent/workspace/yourProject
+```
+
+If you want to enforce this at org level, you need a docker business subscription + [filesystem access policies](https://docs.docker.com/ai/sandboxes/governance/access-controls/filesystem/)
+:::
 
 ---
 
