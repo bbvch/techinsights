@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 440" font-family="sans-serif">
+  <title>The agentic loop: prompt into context, context into the LLM, and tool calls, screen output and skills feeding back into the context.</title>
+  <!-- opaque light panel: the diagram uses dark strokes, this keeps it legible on the dark site theme -->
+  <rect x="0" y="0" width="750" height="440" rx="10" fill="#fdfdfd" stroke="#d5d5d5" stroke-width="1"/>
+  <!-- V1: Linear flow left-to-right, feedback loops arcing back over the top -->
+
+  <!-- Prompt box -->
+  <rect x="10" y="160" width="60" height="50" rx="6" fill="#E3F2FD" stroke="#333" stroke-width="1.5"/>
+  <text x="40" y="190" text-anchor="middle" font-size="13" font-weight="bold">Prompt</text>
+
+  <!-- Context box -->
+  <rect x="100" y="160" width="80" height="50" rx="6" fill="#E3F2FD" stroke="#333" stroke-width="1.5"/>
+  <text x="140" y="190" text-anchor="middle" font-size="13" font-weight="bold">Context</text>
+
+  <!-- Arrow Prompt -> Context -->
+  <line x1="70" y1="185" x2="100" y2="185" stroke="#333" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Arrow Context -> LLM -->
+  <line x1="180" y1="185" x2="230" y2="185" stroke="#333" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- LLM box -->
+  <rect x="230" y="155" width="120" height="60" rx="4" fill="#333" stroke="#333" stroke-width="1.5"/>
+  <text x="290" y="191" text-anchor="middle" font-size="14" font-weight="bold" fill="white">LLM</text>
+
+  <!-- Arrow LLM -> outputs -->
+  <line x1="350" y1="185" x2="420" y2="185" stroke="#333" stroke-width="1.5"/>
+
+  <!-- Branch point -->
+  <circle cx="420" cy="185" r="4" fill="#333"/>
+
+  <!-- 1. Tool Call(s) - top branch -->
+  <line x1="420" y1="185" x2="420" y2="100" stroke="#333" stroke-width="1.5"/>
+  <line x1="420" y1="100" x2="500" y2="100" stroke="#333" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="500" y="75" width="120" height="50" rx="6" fill="#FFF3E0" stroke="#FF9800" stroke-width="1.5"/>
+  <text x="560" y="96" text-anchor="middle" font-size="11" font-weight="bold">Tool Call(s)</text>
+  <text x="560" y="112" text-anchor="middle" font-size="10" fill="#666">→ Result</text>
+
+  <!-- Tool result feedback loop: right, up, left, down to prompt -->
+  <polyline points="620,100 660,100 660,30 145,30 145,160" fill="none" stroke="#FF9800" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+  <text x="340" y="25" text-anchor="middle" font-size="10" fill="#FF9800">result added to context</text>
+
+  <!-- 2. Output to screen - middle branch -->
+  <line x1="420" y1="185" x2="500" y2="185" stroke="#333" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="500" y="160" width="120" height="50" rx="6" fill="#E8F5E9" stroke="#4CAF50" stroke-width="1.5"/>
+  <text x="560" y="181" text-anchor="middle" font-size="11" font-weight="bold">Output to</text>
+  <text x="560" y="197" text-anchor="middle" font-size="11" font-weight="bold">Screen</text>
+
+  <!-- Screen output feedback loop: right, down, left, up to prompt -->
+  <polyline points="620,185 680,185 680,370 40,370 40,210" fill="none" stroke="#4CAF50" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <text x="340" y="380" text-anchor="middle" font-size="10" fill="#4CAF50">show</text>
+
+  <!-- 3. Load Skill(s) - bottom branch -->
+  <line x1="420" y1="185" x2="420" y2="270" stroke="#333" stroke-width="1.5"/>
+  <line x1="420" y1="270" x2="500" y2="270" stroke="#333" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="500" y="245" width="120" height="50" rx="6" fill="#F3E5F5" stroke="#9C27B0" stroke-width="1.5"/>
+  <text x="560" y="266" text-anchor="middle" font-size="11" font-weight="bold">Load Skill(s)</text>
+  <text x="560" y="282" text-anchor="middle" font-size="10" fill="#666">→ into context</text>
+
+  <!-- Skills feedback loop: right, down, left, up to prompt -->
+  <polyline points="620,270 650,270 650,340 145,340 145,210" fill="none" stroke="#9C27B0" stroke-width="1.5" marker-end="url(#arrow-purple)"/>
+  <text x="340" y="335" text-anchor="middle" font-size="10" fill="#9C27B0">loaded into context</text>
+
+  <!-- Arrow markers -->
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#333"/></marker>
+    <marker id="arrow-orange" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#FF9800"/></marker>
+    <marker id="arrow-green" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#4CAF50"/></marker>
+    <marker id="arrow-purple" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#9C27B0"/></marker>
+  </defs>
+</svg>
