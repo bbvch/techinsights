@@ -227,7 +227,18 @@ Also: I have yet to meet a dev using Windows who can tell me with a straight fac
 
 #### 3. docker sbx
 
-Quite a good solution. Use the `--clone` option to ensure you don't make ignored `.env` files accessible.
+Quite a good solution. ~~Use the `--clone` option to ensure you don't make ignored `.env` files accessible.~~
+
+:::warning[Update]
+
+That sentence was true when I wrote it. It is not true anymore.
+
+Clone mode now *additionally* mounts the hosts repository read-only into the sandbox
+-> do not use --clone if you have .env files that the agent should not see
+
+See [the appendix](/sandbox-appendix#b-docker-sbx) for the commands on how to get the old guarantee back and more details on the issue.
+
+:::
 
 Surprisingly, every single dev that I talked to got this running in under 10 minutes (even on Windows).
 That alone makes it a pretty awesome solution.
