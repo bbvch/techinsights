@@ -1,0 +1,26 @@
+.shareButtons {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--ifm-color-emphasis-300);
+}
+
+.button {
+  border: 1px solid var(--ifm-color-emphasis-300);
+  background: var(--ifm-background-surface-color);
+  color: var(--ifm-font-color-base);
+  border-radius: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-decoration: none;
+  line-height: 1.5;
+}
+
+.button:hover {
+  border-color: var(--ifm-color-primary);
+  color: var(--ifm-color-primary);
+}

@@ -1,0 +1,10 @@
+.relatedArticles {
+  margin: 1.5rem 0;
+  padding-top: 2rem;
+  border-top: 1px solid var(--ifm-color-emphasis-300);
+}
+
+.heading {
+  font-size: 1.35rem;
+  margin-bottom: 1.25rem;
+}

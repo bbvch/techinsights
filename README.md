@@ -13,6 +13,7 @@ See for more details [docusaurus requirements](https://docusaurus.io/docs/instal
 - Install dependencies: `npm install`
 - Run locally: `npm start`
 - Build: `npm run build`
+- Test: `npm test`
 
 ## Search
 
@@ -27,6 +28,7 @@ Please read the contribution guidelines: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 - `blog/` — blog posts and assets (each post in a dated folder)
 - `src/` — React components and theme overrides
+- `plugins/` — local Docusaurus plugins (e.g. the blog plugin extended with related articles)
 - `static/` — public assets
 
 If you need help, open an issue or tag a maintainer in your PR.

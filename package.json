@@ -12,11 +12,13 @@
     "serve": "docusaurus serve",
     "write-translations": "docusaurus write-translations",
     "write-heading-ids": "docusaurus write-heading-ids",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "test": "node --test plugins"
   },
   "dependencies": {
     "@dipakparmar/docusaurus-plugin-umami": "2.4.0",
     "@docusaurus/core": "^3.10.2",
+    "@docusaurus/plugin-content-blog": "^3.10.2",
     "@docusaurus/preset-classic": "^3.10.2",
     "@docusaurus/theme-mermaid": "^3.10.2",
     "@giscus/react": "3.1.0",

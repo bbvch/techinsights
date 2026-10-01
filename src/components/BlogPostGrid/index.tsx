@@ -12,6 +12,8 @@ type Props = {
   readonly stretchFewItems?: boolean;
   /** Total number of posts across all pages, used to decide whether to stretch. */
   readonly totalCount?: number;
+  /** Heading element for the post titles, e.g. h3 when the grid is nested below an h2. */
+  readonly titleAs?: 'h2' | 'h3';
 };
 
 export default function BlogPostGrid({
@@ -19,6 +21,7 @@ export default function BlogPostGrid({
   showAuthors = true,
   stretchFewItems = false,
   totalCount = items.length,
+  titleAs: Title = 'h2',
 }: Props): ReactNode {
   return (
     <div
@@ -47,7 +50,7 @@ export default function BlogPostGrid({
             )}
             <div className="blog-post-content">
               <Link to={itemMetadata.permalink}>
-                <h2>{itemMetadata.title}</h2>
+                <Title>{itemMetadata.title}</Title>
               </Link>
               {showAuthors && authors && authors.length > 0 && (
                 <div className="blog-post-authors">
