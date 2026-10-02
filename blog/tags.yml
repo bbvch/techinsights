@@ -76,6 +76,10 @@ pit-of-success:
   label: Pit of Success
   permalink: /pit-of-success
 
+linux:
+  label: Linux
+  permalink: /linux
+
 project-structure:
   label: Project Structure
   permalink: /project-structure
