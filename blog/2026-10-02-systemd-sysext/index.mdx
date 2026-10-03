@@ -8,42 +8,22 @@ tags: [linux, security, testing, release-management]
 image: ./images/cover.png
 ---
 
-Many modern systems are shipped as immutable, verity-protected release images.
-In this operating model, `/usr` is read-only by design, so installing extra
-packages for testing or debugging on the target host is not an option.
+Many systems ship as immutable, verity-protected release images with a read-only
+`/usr`. Installing packages for testing or debugging on the target is not an
+option, yet test environments should stay as close as possible to the release
+image while temporarily adding tooling such as OpenSSH, tracing or diagnostics.
 
-A common engineering requirement is to keep test environments as close as possible
-to the production release image while still introducing temporary tooling
-(for example OpenSSH, diagnostics, tracing, debug or support utilities) during
-testing and debugging.
-
-The core problem is therefore not "how to install software," but "how to extend
-capabilities without mutating the baseline artifact." This article evaluates how
-`systemd-sysext` addresses that problem by layering additional content over the
-immutable base and by preserving a simple rollback path.
-
-
-## Evaluation Scope
-
-This article evaluates an immutable image workflow against practical
-operational criteria:
-
-- The base OS stays untouched (no package installation into `/usr` on target)
-- SSH server binaries and units are shipped as a separate extension artifact
-- Rollback is done by removing one extension image and refreshing sysext
-
-In other words, the objective is to validate feature delivery on top of an
-immutable image without rebuilding the full OS for each iteration.
+The question is therefore not "how to install software," but "how to extend
+the system without changing the baseline." This article shows how
+`systemd-sysext` solves this, using an OpenSSH server as the example.
 
 {/* truncate */}
 
 
 ## What is systemd-sysext?
 
-Immutable distributions such as Flatcar Container Linux, Fedora CoreOS, GNOME OS
-or SteamOS do not allow traditional package installation into `/usr`.
-`systemd-sysext` (System Extensions) addresses this: it mounts an
-**OverlayFS on top of `/usr`** (and `/opt`) without modifying the base system.
+`systemd-sysext` (System Extensions) mounts an **OverlayFS on top of `/usr`**
+(and `/opt`). Extension images add content without modifying the base system.
 
 ```
 Resulting view of /usr after merge:
@@ -55,811 +35,256 @@ Resulting view of /usr after merge:
 └─────────────────────────────────┘
 ```
 
-**Why this matters:**
+- No package manager required on the target
+- The release image is never modified
+- Update or roll back by replacing or removing one file and running `systemd-sysext refresh`
 
-- No package manager required on the target system
-- Full rollback by removing the image and running `systemd-sysext refresh`
-- Simple updates: replace the image file and run `systemd-sysext refresh`
-- The release image itself is never modified
+sysext provides **no isolation**: extension content behaves exactly like natively
+installed software. For debug tooling, that is the goal. For sandboxed services,
+use [Portable Services](https://systemd.io/PORTABLE_SERVICES/) instead.
 
-**What it is not:** sysext provides no isolation. Extension content appears in
-`/usr` exactly as if it had been shipped with the OS. The systemd documentation
-recommends [Portable Services](https://systemd.io/PORTABLE_SERVICES/) for
-shipping sandboxed system services. For debug and support tooling, however,
-"behaves exactly like natively installed software" is precisely the goal, which
-is why sysext is the better fit for the scenario in this article.
+sysext is mainstream on image-based distributions: Flatcar ships Docker and
+Kubernetes components as sysexts, and Fedora CoreOS, GNOME OS and KDE Linux use
+it as well. On classic distributions it is a niche tool for development and
+debugging.
 
+### Mutable hosts
 
-## Where is sysext Used Today?
+By default, `/usr` becomes **read-only** while an extension is merged, even on a
+mutable host, so `apt` or `dnf` updates fail until it is unmerged. Since
+systemd 256, the `--mutable=` option controls this:
 
-sysext is mainstream on image-based distributions:
-
-- **Flatcar Container Linux** ships Docker, containerd and Kubernetes components
-  as sysexts (see the community "sysext-bakery").
-- **Fedora CoreOS and Fedora Atomic Desktops** (Silverblue, Kinoite) are exploring
-  sysexts as an alternative to `rpm-ostree` package layering.
-- **GNOME OS and KDE Linux** use sysexts to add developer tooling on top of the
-  read-only base.
-
-On classic package-managed distributions (Debian, Ubuntu, Fedora Workstation, Arch),
-`apt` or `dnf` can write to `/usr` directly, so sysext remains a niche tool there.
-Typical uses are:
-
-- **Development:** overlay a fresh build of a low-level component (systemd
-  developers do this with systemd itself) and remove it again with `unmerge`,
-  without touching the package database.
-- **Debugging:** temporarily add tools such as `gdb`, `strace` or `perf`.
-- **Initrd extension:** with Unified Kernel Images (UKIs), systemd-stub passes
-  sysext images from the EFI System Partition into the initrd. This adds drivers
-  or tools to a signed UKI without rebuilding it.
-
-> **Caution on mutable hosts:** while an extension is merged, `/usr` and `/opt`
-> become **read-only**, even on a normally writable system. Package updates via
-> `apt` or `dnf` fail until the extensions are unmerged. See the `--mutable=`
-> option in `man systemd-sysext` if you need writes during a merge.
-
-
-## Decision Criteria
-
-When choosing an extension mechanism on immutable hosts, the useful decision
-questions are:
-
-- **Baseline fidelity:** Does the method preserve the exact release image?
-- **Operational reversibility:** Can changes be rolled back quickly and safely?
-- **Boot-time availability:** Are binaries and units present when services start?
-- **Ownership boundaries:** Is software delivery separated from runtime config?
-- **Packaging overhead:** How much process and tooling is needed for production?
-
-The SSH example below is used as a concrete reference workload to answer these
-questions. The conclusion summarizes the results.
-
----
-
-## Prerequisites
-
-The examples were written for Ubuntu (systemd 259). The extension is built on a
-**build host** running the same distribution release as the target, and then
-deployed to the **target host**. For a first experiment, both can be the same
-machine or VM.
-
-On the target host:
+| Mode | Behavior |
+|------|----------|
+| `no` (default) | Merged hierarchy is read-only |
+| `yes` | Writes go to `/var/lib/extensions.mutable/usr/` and persist |
+| `ephemeral` | Writes go to an empty temporary directory and are lost on unmerge |
+| `auto` | Mutable only if `/var/lib/extensions.mutable/usr/` exists |
 
 ```bash
-# Check systemd version (>= 255 recommended for everything in this article;
-# ID=_any needs >= 252, systemd-confext >= 254, the .sysext.raw suffix >= 255)
-systemctl --version | head -1
-
-# The kernel must support the image filesystem (EROFS or Squashfs).
-# Modules appear in /proc/filesystems only once loaded, so also check modinfo.
-grep -E "erofs|squashfs" /proc/filesystems || modinfo -n erofs squashfs
+sudo systemd-sysext refresh --mutable=ephemeral
 ```
 
-On the build host:
+Writes do not reach the base `/usr`, but land in a separate layer. A package
+update performed while merged is lost on unmerge (`ephemeral`) or only visible
+while merged (`yes`). To route writes back to the real `/usr`, make the write
+directory a symlink: `/var/lib/extensions.mutable/usr → /usr`.
 
-```bash
-# Tools for building production images later
-sudo apt-get install -y erofs-utils
+For the boot-time service, set the mode persistently in `sysext.conf`
+(systemd 259 and later):
 
-# Optional: if your platform standardizes on Squashfs
-sudo apt-get install -y squashfs-tools
+```ini
+# /etc/systemd/sysext.conf.d/60-mutable.conf
+[SysExt]
+Mutable=auto
 ```
 
-> **Why EROFS?**
-> EROFS (Enhanced Read-Only File System) is a modern read-only format with
-> good compression and fast mount behavior, making it a strong default for
-> immutable extension images.
 
----
+## Build the Extension
 
-## Extension Layout and Compatibility Rules
+The examples use Ubuntu with systemd 259 (≥ 255 recommended). The extension is
+built on a **build host** running the same release as the target. For a first
+test, both can be the same machine.
 
-Every extension follows a strict convention: all content must live **under `/usr`**
-(or `/opt`). Anything else in the extension, for example an `etc/` directory,
-is silently ignored.
-
-> Although `/usr` is read-only on the base OS, `systemd-sysext` **does not write** to it.
-> Instead, it mounts an OverlayFS layer on top: the base `/usr` remains completely
-> untouched, and the extension's `usr/` content appears merged from the perspective
-> of all processes running on the system. This is exactly why you can ship new binaries
-> and units without modifying the immutable baseline.
+All extension content must live under `usr/` (or `opt/`). Anything else is
+ignored. A metadata file named after the extension is required:
 
 ```
-ssh-server/                                   ← extension name
+ssh-server/
 └── usr/
-    ├── lib/
-    │   ├── extension-release.d/
-    │   │   └── extension-release.ssh-server  ← REQUIRED: metadata file
-    │   ├── openssh/
-    │   │   ├── sshd-auth
-    │   │   └── sshd-session
-    │   ├── systemd/
-    │   │   └── system/
-    │   │       ├── ssh.service
-    │   │       └── ssh.socket
-    │   └── sysusers.d/
-    │       └── openssh-server.conf
-    ├── sbin/
-    │   └── sshd
-    └── share/
-        └── openssh/
-            └── sshd_config                   ← default config template
+    ├── lib/extension-release.d/extension-release.ssh-server   ← required
+    ├── lib/systemd/system/ssh.service
+    └── sbin/sshd
 ```
 
-> **Important:** The metadata filename (`extension-release.ssh-server`) must match
-> the extension name **exactly**. For directories that is the folder name, for images
-> it is the filename without the `.raw` or `.sysext.raw` suffix.
+### Step 1: Extract the package
 
-Example content of `usr/lib/extension-release.d/extension-release.ssh-server`:
-
-```
-# systemd-sysext extension metadata
-ID=_any
-EXTENSION_RELOAD_MANAGER=1
-```
-
-The full metadata setup and OS-specific targeting are covered in Step 3.
-
----
-
-## Reference Implementation: Directory-Based Extension
-
-In this chapter, we will use OpenSSH server as a concrete example extension.
-
-The simplest starting point is a directory-based extension. It is not the final
-production format, but it is the best format for inspection, verification, and
-fast troubleshooting.
-
-### Step 1: Create a working directory
+Download the package and extract it, without installing it:
 
 ```bash
-WORKDIR="$(pwd)/myextensions"      # adjust path to your preference
+WORKDIR="$(pwd)/myextensions"
 EXTNAME="ssh-server"
 EXTDIR="${WORKDIR}/${EXTNAME}"
-mkdir -p "${EXTDIR}"
-cd "${WORKDIR}"
-```
+mkdir -p "${EXTDIR}" && cd "${WORKDIR}"
 
-### Step 2: Extract the OpenSSH server package
-
-We download the package on the build host and extract it directly into our
-extension directory: **no `apt install`**, no changes to the running system.
-
-```bash
-# Download the package
 apt-get download openssh-server
-
-# Extract into the extension directory
 dpkg-deb -x openssh-server_*.deb "${EXTDIR}"
 
-# Clean up the .deb file
-rm openssh-server_*.deb
-```
-
-The package also contains files below `/etc` (PAM configuration, `moduli`,
-defaults). sysext would ignore them, so we move them aside for later use and
-drop documentation that is not needed on the target:
-
-```bash
+# /etc is ignored by sysext: keep it aside for the target configuration
 mv "${EXTDIR}/etc" "${WORKDIR}/ssh-etc"
-rm -rf "${EXTDIR}/usr/share/doc" "${EXTDIR}/usr/share/man" \
-       "${EXTDIR}/usr/share/lintian" "${EXTDIR}/usr/share/apport"
+rm -rf "${EXTDIR}/usr/share/doc" "${EXTDIR}/usr/share/man"
 ```
 
-Check what remains (run from within `${EXTDIR}`):
+`dpkg-deb -x` does not resolve dependencies. On a minimal base image, extract
+missing packages (for example `openssh-client`) into the same tree, always from
+the same distribution release as the target.
+
+### Step 2: Add metadata and enable the service
 
 ```bash
-cd "${EXTDIR}"
-find . -type f -o -type l | sort
-```
-
-Example output (Ubuntu, OpenSSH 10.2):
-```
-./usr/lib/openssh/ssh-session-cleanup
-./usr/lib/openssh/sshd-auth
-./usr/lib/openssh/sshd-session
-./usr/lib/systemd/system-generators/sshd-socket-generator
-./usr/lib/systemd/system/rescue-ssh.target
-./usr/lib/systemd/system/ssh.service
-./usr/lib/systemd/system/ssh.socket
-./usr/lib/systemd/system/sshd-keygen.service
-./usr/lib/systemd/system/sshd.service
-./usr/lib/systemd/system/sshd@.service
-./usr/lib/sysusers.d/openssh-server.conf
-./usr/lib/tmpfiles.d/openssh-server.conf
-./usr/sbin/sshd
-./usr/share/openssh/sshd_config
-./usr/share/openssh/sshd_config.md5sum
-```
-
-> **Dependencies:** `dpkg-deb -x` does not resolve dependencies. `openssh-server`
-> requires `openssh-client` (for example `ssh-keygen`), `openssh-sftp-server` and
-> several libraries. A general-purpose Ubuntu base usually has them; a minimal
-> immutable image may not. On the target, `ldd /usr/sbin/sshd | grep "not found"`
-> after merging shows missing libraries. Missing packages can be extracted into
-> the same extension tree with `apt-get download` and `dpkg-deb -x`. Always take
-> packages from the **same distribution release** as the target, which is also
-> what the metadata in Step 3 enforces.
-
-### Step 3: Create the extension metadata
-
-The `extension-release` file tells systemd-sysext which OS this extension targets.
-**If it doesn't match, systemd will reject the extension.**
-
-```bash
-mkdir -p "${EXTDIR}/usr/lib/extension-release.d"
-
-cat > "${EXTDIR}/usr/lib/extension-release.d/extension-release.${EXTNAME}" << EOF
-# systemd-sysext extension metadata
-ID=_any
-EXTENSION_RELOAD_MANAGER=1
-EOF
-
-# Verify the content
-cat "${EXTDIR}/usr/lib/extension-release.d/extension-release.${EXTNAME}"
-```
-
-For the first functional test, `ID=_any` is convenient because it avoids
-compatibility rejection while you validate the flow.
-`EXTENSION_RELOAD_MANAGER=1` tells systemd-sysext to reload the service manager
-after merging, so the new unit files are picked up.
-
-After successful testing, tighten the metadata to your exact target OS.
-The variables `ID` and `VERSION_ID` are read from `/etc/os-release` of the
-build host, which runs the same release as the target:
-
-```bash
-# Read OS variables from the build host
 . /etc/os-release
-
+mkdir -p "${EXTDIR}/usr/lib/extension-release.d"
 cat > "${EXTDIR}/usr/lib/extension-release.d/extension-release.${EXTNAME}" << EOF
-# systemd-sysext extension metadata
 ID=${ID}
 VERSION_ID=${VERSION_ID}
 EXTENSION_RELOAD_MANAGER=1
 EOF
-```
 
-For example on Ubuntu 26.04, this produces:
+# Ship the enablement in the extension instead of running systemctl enable
+mkdir -p "${EXTDIR}/usr/lib/systemd/system/multi-user.target.wants"
+ln -sf ../ssh.service "${EXTDIR}/usr/lib/systemd/system/multi-user.target.wants/"
 
-```
-# systemd-sysext extension metadata
-ID=ubuntu
-VERSION_ID=26.04
-EXTENSION_RELOAD_MANAGER=1
-```
-
-If the OS defines `SYSEXT_LEVEL=` in its `os-release`, use that field instead of
-`VERSION_ID=`. It allows one extension to match several OS versions with a
-compatible ABI.
-
-### Step 4: Set ownership
-
-The files in the extension appear in `/usr` with the ownership they have in the
-extension, so they must be owned by root:
-
-```bash
 sudo chown -R root:root "${EXTDIR}"
 ```
 
-### Step 5: Install and activate the extension
+systemd rejects the extension if `ID` and `VERSION_ID` do not match the target's
+`/etc/os-release` (`ID=_any` skips the check for quick experiments).
+`EXTENSION_RELOAD_MANAGER=1` reloads systemd after merging so the new units are
+picked up.
 
-`/run/extensions/` lives in RAM and is cleared on reboot, which makes it a good
-place for a first test.
+### Step 3: Test as a directory
+
+`/run/extensions/` lives in RAM and is cleared on reboot:
 
 ```bash
-# Copy the extension into the search path
 sudo mkdir -p /run/extensions
 sudo cp -a "${EXTDIR}" /run/extensions/
-
-# List the extensions systemd-sysext has found
-systemd-sysext list
-```
-
-Now **merge** (activate) the extension and check the status:
-
-```bash
 sudo systemd-sysext merge
-systemd-sysext status
+systemd-sysext status     # /usr  ssh-server  <timestamp>
+which sshd                # /usr/sbin/sshd
 ```
 
-Output:
-```
-HIERARCHY EXTENSIONS SINCE
-/opt      none       -
-/usr      ssh-server <timestamp of the merge>
-```
 
-Verify that the `sshd` binary is now available:
+## Configure and Start SSH
+
+Package maintainer scripts are not executed, so the `/etc` state they would
+create has to be set up on the target. This only touches mutable `/etc`, never
+`/usr`:
 
 ```bash
-which sshd
-# → /usr/sbin/sshd
-
-sudo sshd -V
-# → OpenSSH_x.y (depends on distro/package version)
-```
-
-If the merge fails, see [Troubleshooting](#troubleshooting).
-
-> **Changing a directory extension:** the active copy is the one in
-> `/run/extensions/`. After editing `${EXTDIR}`, copy it again before refreshing:
-> `sudo rm -rf /run/extensions/${EXTNAME} && sudo cp -a "${EXTDIR}" /run/extensions/ && sudo systemd-sysext refresh`
-
----
-
-## Start and Validate the SSH Service
-
-> **Note:** If `sshd` is already installed natively on your system, the extension's
-> version shadows it via the overlay while the extension is merged. The base
-> system is not modified. Run `which sshd` before activating to know the current state.
-
-`dpkg-deb -x` does not run the package's maintainer scripts. The steps those
-scripts would normally perform (creating the `sshd` system user, creating
-`/etc/ssh/sshd_config`, installing the PAM configuration) have to be done on the
-target. All of them touch only mutable state in `/etc`, not `/usr`. If build host
-and target are different machines, copy `${WORKDIR}/ssh-etc` to the target first:
-
-```bash
-# Create the sshd privilege separation user from the shipped sysusers.d file
-sudo systemd-sysusers
-
-# Provide a minimal /etc configuration from the extension and the saved etc/ payload
+sudo systemd-sysusers                      # creates the sshd user
 sudo install -D -m 644 /usr/share/openssh/sshd_config /etc/ssh/sshd_config
 sudo install -D -m 644 "${WORKDIR}/ssh-etc/pam.d/sshd" /etc/pam.d/sshd
-sudo install -D -m 644 "${WORKDIR}/ssh-etc/ssh/moduli" /etc/ssh/moduli
-
-# Generate SSH host keys (stored in /etc/ssh, outside the overlay)
-sudo ssh-keygen -A
+sudo ssh-keygen -A                         # host keys
+sudo systemctl start ssh.service
 ```
 
-> The sshd user persists in `/etc/passwd`. The systemd documentation states that
-> sysext is not suitable for shipping `sysusers.d` definitions that must be applied
-> during boot, so run `systemd-sysusers` once after the first merge (or provide the
-> user via the base image or a confext).
+This separation is intentional: sysext delivers software, configuration stays
+with the operator. To ship configuration as an artifact too, there are two options:
 
-Start the service:
+- **systemd-confext** overlays `/etc` the same way sysext overlays `/usr`. Use it
+  when configuration should be versioned independently.
+- A **service drop-in** in `usr/lib/systemd/system/ssh.service.d/` inside the
+  sysext, pointing `sshd -f` to a config file under `/usr`. Use it when software
+  and defaults belong together.
 
-```bash
-# Reload unit files (happens automatically with EXTENSION_RELOAD_MANAGER=1)
-sudo systemctl daemon-reload
-
-# Enable and start the SSH service
-sudo systemctl enable --now ssh.service
-
-# Check status
-systemctl status ssh.service
-```
-
-Test the connection (this requires an account with a password or an authorized key):
+A minimal drop-in example, added to the extension tree before building the image:
 
 ```bash
-ssh -o StrictHostKeyChecking=no localhost 'echo "SSH extension is working!"'
-```
-
-> **Note on `/etc/ssh/`:**
-> `systemd-sysext` only overlays `/usr` and `/opt`. Files such as `/etc/ssh/sshd_config`
-> live **outside** the overlay and are edited normally. This is intentional:
-> the software comes from the extension, the configuration stays with the operator.
-
-This separation is operationally important: sysext is a software delivery layer,
-not a runtime state management layer.
-
-### What about `/etc` overlays?
-
-- For `/etc` configuration overlays, use **systemd-confext** (not sysext).
-- In practice, combine `systemd-sysext` for binaries in `/usr` with `systemd-confext`
-  for config in `/etc`.
-- If you want immutable defaults tied to your shipped service, ship a config file
-  and a systemd service drop-in in `/usr/lib/systemd/system/*.d/` inside the sysext.
-
-This is a design choice with trade-offs:
-
-- Use **confext** when configuration ownership should stay independent.
-- Use **sysext drop-ins** when software and default behavior should be versioned together.
-
-#### Option A: Separate confext for `/etc`
-
-Use this when you want to ship config independently from the software payload.
-Confexts are searched for in `/run/confexts/`, `/var/lib/confexts/`,
-`/usr/lib/confexts/` and `/usr/local/lib/confexts/`.
-
-> **Caution:** By default, merging a confext makes `/etc` read-only until it is
-> unmerged. Check that your system tolerates this, or see the `--mutable=` option
-> in `man systemd-confext`.
-
-```bash
-# 0) Check if systemd-confext is available
-if ! command -v systemd-confext >/dev/null; then
-    echo "systemd-confext is not available on this host. Use Option B."
-fi
-
-# 1) Create a confext tree for the /etc payload
-CONFNAME="ssh-config"
-CONFDIR="${WORKDIR}/${CONFNAME}"
-mkdir -p "${CONFDIR}/etc/ssh/sshd_config.d"
-mkdir -p "${CONFDIR}/etc/pam.d"
-mkdir -p "${CONFDIR}/etc/extension-release.d"
-
-# 2) Add the base configuration and your sshd config fragment
-cp /usr/share/openssh/sshd_config "${CONFDIR}/etc/ssh/sshd_config"
-cp "${WORKDIR}/ssh-etc/ssh/moduli" "${CONFDIR}/etc/ssh/moduli"
-cp "${WORKDIR}/ssh-etc/pam.d/sshd" "${CONFDIR}/etc/pam.d/sshd"
-
-cat > "${CONFDIR}/etc/ssh/sshd_config.d/10-confext.conf" << 'EOF'
-PasswordAuthentication no
-PermitRootLogin no
-PubkeyAuthentication yes
-EOF
-
-# 3) Add compatibility metadata for confext matching
-#    (ID=_any accepts any OS; use ID= and VERSION_ID= for a specific target)
-cat > "${CONFDIR}/etc/extension-release.d/extension-release.${CONFNAME}" << 'EOF'
-ID=_any
-EOF
-
-# 4) Install and activate
-sudo chown -R root:root "${CONFDIR}"
-sudo mkdir -p /run/confexts
-sudo cp -a "${CONFDIR}" /run/confexts/
-sudo systemd-confext merge
-
-# Optional: inspect status
-systemd-confext status
-
-# 5) Reload SSH to consume the new config
-sudo systemctl reload ssh.service
-```
-
-#### Option B: Ship a service drop-in from the sysext
-
-Use this when a small set of fixed defaults should always be present with the
-service binary extension, or when your target system does not provide
-`systemd-confext` yet.
-
-Ubuntu's `ssh.service` validates the configuration with `sshd -t` before starting
-and on reload, so the drop-in overrides `ExecStartPre=`, `ExecStart=` and
-`ExecReload=` to use the shipped config file consistently.
-
-```bash
-# 1) Ship an immutable sshd config inside the sysext (/usr)
-sudo mkdir -p "${EXTDIR}/usr/lib/openssh"
-
-sudo tee "${EXTDIR}/usr/lib/openssh/sshd_config.sysext" >/dev/null << 'EOF'
+CONF=/usr/lib/openssh/sshd_config.sysext
+sudo tee "${EXTDIR}${CONF}" >/dev/null << 'EOF'
 PermitRootLogin no
 PasswordAuthentication no
-KbdInteractiveAuthentication no
-PubkeyAuthentication yes
 UsePAM yes
-Subsystem sftp /usr/lib/openssh/sftp-server
 EOF
 
-# 2) Create a unit drop-in inside the sysext tree
 sudo mkdir -p "${EXTDIR}/usr/lib/systemd/system/ssh.service.d"
-
-sudo tee "${EXTDIR}/usr/lib/systemd/system/ssh.service.d/10-sysext-config.conf" >/dev/null << 'EOF'
+sudo tee "${EXTDIR}/usr/lib/systemd/system/ssh.service.d/10-sysext.conf" >/dev/null << EOF
 [Service]
-# Use the sysext-shipped config from /usr instead of /etc.
 ExecStartPre=
-ExecStartPre=/usr/sbin/sshd -t -f /usr/lib/openssh/sshd_config.sysext
+ExecStartPre=/usr/sbin/sshd -t -f ${CONF}
 ExecStart=
-ExecStart=/usr/sbin/sshd -D -f /usr/lib/openssh/sshd_config.sysext $SSHD_OPTS
+ExecStart=/usr/sbin/sshd -D -f ${CONF} \$SSHD_OPTS
 ExecReload=
-ExecReload=/usr/sbin/sshd -t -f /usr/lib/openssh/sshd_config.sysext
-ExecReload=/bin/kill -HUP $MAINPID
+ExecReload=/usr/sbin/sshd -t -f ${CONF}
+ExecReload=/bin/kill -HUP \$MAINPID
 EOF
-
-# 3) Replace the active copy, re-merge and restart
-sudo rm -rf "/run/extensions/${EXTNAME}"
-sudo cp -a "${EXTDIR}" /run/extensions/
-sudo systemd-sysext refresh
-sudo systemctl daemon-reload
-sudo systemctl restart ssh.service
 ```
 
-The `Subsystem sftp` line requires `/usr/lib/openssh/sftp-server` from the
-`openssh-sftp-server` package. Extract it into the extension as described in
-Step 2, or drop the line if SFTP is not needed.
+The empty `ExecStartPre=`, `ExecStart=` and `ExecReload=` lines reset the
+commands of Ubuntu's `ssh.service`, so both the config check and the daemon use
+the shipped config. `/etc/ssh/sshd_config` is then no longer needed. Host keys,
+the `sshd` user and the PAM configuration remain in `/etc`.
 
-This keeps the runtime defaults fully inside the sysext artifact.
-Only state and host-specific data remain in `/etc` (host keys, the `sshd` user,
-PAM configuration).
 
-> **Note:** `sudo tee FILE >/dev/null` is used instead of `sudo cat > FILE`
-> because shell redirection (`>`) runs as the current (non-root) user, and
-> `${EXTDIR}` is owned by root since Step 4. `tee` running under `sudo` writes
-> the file with root privileges, and `>/dev/null` suppresses `tee`'s echo of
-> the content to the terminal.
+## Package for Production
 
----
-
-## Package the Extension for Production
-
-For production, package the extension as a read-only image.
-Files with the `.raw` suffix are picked up as image-based extensions. Since
-systemd 255, `.sysext.raw` is the recommended suffix to make the purpose visible
-in the filename.
-
-- Preferred: EROFS (modern read-only format, fast mount behavior)
-- Optional: Squashfs (widely used and often already standardized)
-
-From an operations perspective, this marks the shift from a debug-friendly
-directory artifact to a deployable, immutable artifact with predictable behavior.
-
-### Enable service activation inside the extension
-
-Instead of running `systemctl enable` on each target host, ship the unit
-symlinks directly in the extension content before building the image:
+For production, build a read-only EROFS image (Squashfs works too). Since
+systemd 255, `.sysext.raw` is the recommended suffix:
 
 ```bash
-# Ensure the systemd .wants directories exist in the extension tree
-sudo mkdir -p "${EXTDIR}/usr/lib/systemd/system/multi-user.target.wants"
-sudo mkdir -p "${EXTDIR}/usr/lib/systemd/system/sockets.target.wants"
-
-# Enable service and socket by default via relative symlinks
-sudo ln -sf ../ssh.service \
-    "${EXTDIR}/usr/lib/systemd/system/multi-user.target.wants/ssh.service"
-sudo ln -sf ../ssh.socket \
-    "${EXTDIR}/usr/lib/systemd/system/sockets.target.wants/ssh.socket"
+sudo mkfs.erofs -zlz4hc "${WORKDIR}/${EXTNAME}.sysext.raw" "${EXTDIR}"   # ~1.3 MB
 ```
 
-This keeps the default enablement inside the image artifact itself.
-
-### Build the image
-
-On the build host:
+Install it persistently on the target and remove the test copy, which would
+otherwise take precedence:
 
 ```bash
-# Preferred: create an EROFS image
-sudo mkfs.erofs -zlz4hc \
-    "${WORKDIR}/${EXTNAME}.sysext.raw" \
-    "${EXTDIR}"
-```
-
-```bash
-# Optional: create a Squashfs image instead
-sudo mksquashfs "${EXTDIR}" \
-    "${WORKDIR}/${EXTNAME}.sysext.raw" \
-    -comp zstd \
-    -noappend
-```
-
-Check the size:
-
-```bash
-du -h "${WORKDIR}/${EXTNAME}.sysext.raw"
-# OpenSSH 10.2 without documentation: about 1.3 MB (EROFS lz4hc), about 0.8 MB (Squashfs zstd)
-```
-
-### Install, verify and activate the image
-
-On the target host:
-
-```bash
-# Install the image in the persistent extension directory
 sudo mkdir -p /var/lib/extensions
 sudo cp "${WORKDIR}/${EXTNAME}.sysext.raw" /var/lib/extensions/
-
-# Remove the directory-based test copy. /run/extensions has a higher priority
-# than /var/lib/extensions, so it would otherwise shadow the image.
 sudo rm -rf "/run/extensions/${EXTNAME}"
-
-# Inspect the image: shows the extension-release metadata and the content
-sudo systemd-dissect "/var/lib/extensions/${EXTNAME}.sysext.raw"
-sudo systemd-dissect --list "/var/lib/extensions/${EXTNAME}.sysext.raw" | head -20
-
-# Re-merge with the image (unmerge + merge in one step)
 sudo systemd-sysext refresh
-
-# Check status
-systemd-sysext status
+sudo systemctl enable systemd-sysext.service    # not enabled by default on Ubuntu
 ```
 
-Output:
-```
-HIERARCHY EXTENSIONS SINCE
-/opt      none       -
-/usr      ssh-server <timestamp of the merge>
-```
+`systemd-sysext.service` merges extensions before `basic.target`, so binaries and
+units are available when regular services start, but not in the initrd.
 
-### Integrity: signed images
+On a verity-protected host, extensions should be protected the same way:
+`systemd-repart --make-ddi=sysext` or [mkosi](https://github.com/systemd/mkosi)
+build signed images, and `--image-policy=` enforces that only signed extensions
+are accepted.
 
-The images built above are plain filesystem images without integrity protection.
-On a verity-protected host, extensions should be protected the same way.
-`systemd-repart --make-ddi=sysext` and [mkosi](https://github.com/systemd/mkosi)
-can build signed Discoverable Disk Images (DDIs) with dm-verity, and the
-`--image-policy=` option of systemd-sysext can be used to enforce that only
-signed extensions are accepted. The details are beyond the scope of this article.
 
----
-
-## When sysext Content Becomes Available During Boot
-
-`systemd-sysext.service` runs during early userspace startup after local file
-systems are mounted, ordered before `sysinit.target`. systemd guarantees that it
-has finished before `basic.target` is reached, so the content layered into `/usr`
-is available when regular services start.
-
-For this SSH scenario, unit files and binaries shipped in the extension are
-therefore present in time for normal service startup ordering.
-
-Boundary to keep in mind: content from `/var/lib/extensions/` is not available in
-the initrd, and it cannot be used by components that run before local file systems
-are mounted. For the initrd, systemd-stub can provide extensions from the EFI
-System Partition (`/.extra/sysext/`). A stricter image policy applies to those.
-
-On some distributions (for example Ubuntu), the service is not enabled by default:
+## Rollback
 
 ```bash
-# Ensure sysext processing runs automatically during boot
-sudo systemctl enable systemd-sysext.service
-
-# Only if you use confexts (Option A)
-sudo systemctl enable systemd-confext.service
-```
-
-`ssh.service` and `ssh.socket` are enabled through the symlinks embedded in the
-extension image.
-
----
-
-## Rollback in 30 Seconds
-
-This is one of the biggest advantages of systemd-sysext: rollback is simple.
-
-```bash
-# 1. Stop SSH
-sudo systemctl stop ssh.service ssh.socket
-
-# 2. Only if it was enabled with systemctl enable (symlinks in /etc)
-sudo systemctl disable ssh.service
-
-# 3. Remove the image and re-merge the remaining extensions
+sudo systemctl stop ssh.service
 sudo rm /var/lib/extensions/ssh-server.sysext.raw
 sudo systemd-sysext refresh
-sudo systemctl daemon-reload
-
-# 4. Verify: sshd is gone
-which sshd  # → no output
+which sshd    # → no output
 ```
 
-`refresh` only removes the deleted extension. Other extensions stay active.
-`systemd-sysext unmerge` would deactivate **all** extensions at once.
+`refresh` only removes the deleted extension, others stay active. No package
+cleanup, no leftovers in `/usr`. Only the host state in `/etc` (keys, config,
+`sshd` user) remains.
 
-The base system is **completely unchanged**: no package cleanup, no `apt remove`,
-no leftovers in `/usr`. Host-specific state created on the target (host keys and
-configuration in `/etc/ssh`, the `sshd` user) remains and can be removed separately
-if required.
-
-The practical implication is that rollback complexity is proportional to the
-extension lifecycle, not to OS package dependency graphs.
-
-To disable an extension temporarily without deleting it, create an empty
-directory with the extension name in `/etc/extensions/`. It masks the image in
-`/var/lib/extensions/`:
-
-```bash
-sudo mkdir -p /etc/extensions/ssh-server
-sudo systemd-sysext refresh
-```
-
----
-
-## Operational Reference
-
-| Command | Description |
-|---------|-------------|
-| `systemd-sysext list` | Show all extensions found in the search paths |
-| `systemd-sysext status` | Show merged extensions per hierarchy |
-| `sudo systemd-sysext merge` | Activate all extensions into `/usr` and `/opt` |
-| `sudo systemd-sysext unmerge` | Deactivate all extensions |
-| `sudo systemd-sysext refresh` | Unmerge + merge in one step (after changes) |
-| `sudo systemd-dissect <image>` | Show image metadata including extension-release |
-| `sudo systemd-dissect --list <image>` | List image contents |
-| `mkfs.erofs -zlz4hc <image> <dir>` | Create an EROFS image |
-
-### Extension search paths
-
-systemd-sysext scans these directories, in order of precedence:
-
-```
-/etc/extensions/         ← local overrides and masking (symlinks to images)
-/run/extensions/         ← temporary extensions (RAM, lost on reboot)
-/var/lib/extensions/     ← persistent extensions (recommended location)
-```
-
-If an extension with the same name exists in several directories, the one with
-the highest precedence wins.
-
----
 
 ## Troubleshooting
 
 ```bash
-# Which extensions are found, and which are merged?
-systemd-sysext list
-systemd-sysext status
-
-# Merge with debug output to see why an extension is rejected
-sudo SYSTEMD_LOG_LEVEL=debug systemd-sysext refresh
-
-# Logs of the boot-time service (manual runs print to the terminal instead)
-journalctl -u systemd-sysext --no-pager
-
-# Inspect the extension-release metadata
-cat "${EXTDIR}/usr/lib/extension-release.d/extension-release.${EXTNAME}"   # directory
-sudo systemd-dissect /var/lib/extensions/ssh-server.sysext.raw              # image
-
-# Compare with the running OS
-grep -E "^(ID|VERSION_ID|SYSEXT_LEVEL)=" /etc/os-release
+systemd-sysext list                                      # found extensions
+sudo SYSTEMD_LOG_LEVEL=debug systemd-sysext refresh      # why was it rejected?
+sudo systemd-dissect /var/lib/extensions/ssh-server.sysext.raw   # image metadata
 ```
 
-Common causes for a rejected extension:
+Typical causes: `ID`/`VERSION_ID` do not match `/etc/os-release`, the metadata
+filename does not match the extension name, or the kernel lacks EROFS/Squashfs
+support. If `ssh.service` fails, check for a missing `sshd` user, config or host keys.
 
-- `ID` or `VERSION_ID` (or `SYSEXT_LEVEL`) in the metadata file does not match `/etc/os-release`.
-- The metadata filename does not match the extension or image name.
-- The image filesystem (EROFS or Squashfs) is not supported by the running kernel.
-
-If `ssh.service` fails to start, `journalctl -u ssh.service` usually points to a
-missing `sshd` user, a missing `/etc/ssh/sshd_config`, or missing host keys (see
-[Start and Validate the SSH Service](#start-and-validate-the-ssh-service)).
-
-## Limits and Failure Modes
-
-`systemd-sysext` is strong when software should be layered into `/usr`, but it is
-not a universal replacement for all lifecycle needs.
-
-- It does not manage `/etc` configuration (use confext or host configuration management).
-- Package maintainer scripts are not executed. Users, configuration and other
-  `/etc` state must be provided separately.
-- Dependencies are not resolved. The extension must be built against the exact
-  target release.
-- It is unavailable in the initrd from `/var/lib/extensions` and cannot satisfy
-  requirements before local file systems are mounted.
-- Compatibility metadata mismatches fail safe by rejecting the extension.
-- It provides no isolation. Use Portable Services if sandboxing is required.
-- On mutable hosts, `/usr` and `/opt` are read-only while extensions are merged,
-  which blocks package updates unless `--mutable=` is used.
-- Runtime state and secrets still belong in regular mutable paths (`/etc`, `/run`, `/var`).
-
----
 
 ## Conclusion
 
-For immutable operating models, `systemd-sysext` is best understood as a
-controlled software layering mechanism with strong baseline preservation.
+`systemd-sysext` delivers software into immutable systems without touching the
+release image:
 
-Evaluated against the decision criteria:
+- **Baseline fidelity:** the release image stays bit-for-bit unchanged.
+- **Reversibility:** one file and one `refresh` roll back the change.
+- **Clear ownership:** software in `/usr` via sysext, configuration in `/etc` or a confext.
+- **Limits:** no dependency resolution, no maintainer scripts, no isolation, not
+  available in the initrd from `/var/lib/extensions`.
 
-| Criterion | Result |
-|-----------|--------|
-| Baseline fidelity | The release image stays bit-for-bit unchanged. Extension content is layered on top. |
-| Operational reversibility | Removing one file and running `refresh` rolls back. No package state to clean up. |
-| Boot-time availability | Content is available before `basic.target`, in time for regular services. Not suitable for initrd or early-boot components. |
-| Ownership boundaries | Clear: sysext delivers software in `/usr`, configuration stays in `/etc` or a confext. |
-| Packaging overhead | Low for tests: extract packages and build an image. Production needs signed images, dependency handling and a build pipeline matching the target release. |
+The SSH example demonstrates the principle. The same technique applies to
+monitoring agents, VPN clients, debuggers or custom CLI tools.
 
-Its main value is not just convenience, but reduction of operational risk:
-the release image remains intact, extension payloads are explicit artifacts,
-and rollback remains fast and deterministic.
 
-The combination of OverlayFS, read-only extension images (for example EROFS),
-and native systemd integration makes it a practical option for:
+## Further Reading
 
-- **Immutable OS designs** (read-only `/usr`)
-- **Independent updates** of individual components without rebuilding the OS image
-- **Test and staging environments** with temporary tooling and instant rollback
-
-The SSH example demonstrates the principle. The same technique applies to other
-tooling such as monitoring agents, VPN clients or custom CLI tools.
-
-## Appendix
-
-### Further Reading
-
-- `man systemd-sysext`
-- `man systemd-confext`
-- `man systemd-dissect`
+- `man systemd-sysext`, `man systemd-confext`, `man systemd-dissect`
 - https://www.freedesktop.org/software/systemd/man/latest/systemd-sysext.html
 - https://uapi-group.org/specifications/specs/extension_image/
 - https://systemd.io/PORTABLE_SERVICES/
 
+## Image credits
+
+- Cover image generated by Claude
