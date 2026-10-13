@@ -117,10 +117,14 @@ a:hover {
   text-underline-offset: 0.25rem;
 }
 
+/* Button labels and tags never use link underlines. */
+:is(button, .button, [role='button'], .pagination-nav__link, .share-button, a[rel='tag']):is(:hover, :focus-visible) {
+  text-decoration: none;
+}
+
 /* Tags and share actions use the same interaction styles. */
 :is(a[rel='tag'], .share-button) {
   background-color: transparent;
-  text-decoration: none;
   transition: color var(--ifm-transition-fast),
     border-color var(--ifm-transition-fast),
     background-color var(--ifm-transition-fast);
@@ -135,7 +139,6 @@ a[rel='tag'] {
   border-color: var(--ui-control-accent);
   background-color: color-mix(in srgb, var(--ui-control-accent) 8%, transparent);
   color: var(--ui-control-accent);
-  text-decoration: none;
 }
 
 :is(a[rel='tag'], .share-button):focus-visible {
