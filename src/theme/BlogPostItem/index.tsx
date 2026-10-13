@@ -15,7 +15,7 @@ export default function BlogPostItemWrapper(props: Props): React.JSX.Element {
 
   return (
     <>  
-      <img src={assets.image}></img>
+      {assets.image && <img src={assets.image} alt={metadata.title} />}
       <BlogPostItem {...props}  />
       {isBlogPostPage && <ShareButtons />}
       {isBlogPostPage && <RelatedArticles />}
