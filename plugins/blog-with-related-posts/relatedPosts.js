@@ -26,6 +26,15 @@ function getAuthorKeys(post) {
 function computeScore(post, candidate) {
   const tags = new Set(getTagPermalinks(post));
   const authors = new Set(getAuthorKeys(post));
+  return computeScoreWithSets(tags, authors, candidate);
+}
+
+/**
+ * @param {ReadonlySet<string>} tags
+ * @param {ReadonlySet<string>} authors
+ * @param {BlogPost} candidate
+ */
+function computeScoreWithSets(tags, authors, candidate) {
   const tagOverlap = getTagPermalinks(candidate).filter((tag) => tags.has(tag)).length;
   const hasAuthorOverlap = getAuthorKeys(candidate).some((key) => authors.has(key));
   return tagOverlap * TAG_SCORE + (hasAuthorOverlap ? AUTHOR_SCORE : 0);
@@ -45,9 +54,12 @@ function getTime(post) {
  * @returns {BlogPost[]}
  */
 function getRelatedPosts(post, allPosts, maxCount = MAX_RELATED_POSTS) {
+  const tags = new Set(getTagPermalinks(post));
+  const authors = new Set(getAuthorKeys(post));
+
   return allPosts
     .filter((candidate) => candidate.id !== post.id && !candidate.metadata.unlisted)
-    .map((candidate) => ({ candidate, score: computeScore(post, candidate) }))
+    .map((candidate) => ({ candidate, score: computeScoreWithSets(tags, authors, candidate) }))
     .filter(({ score }) => score > 0)
     .sort((a, b) => b.score - a.score || getTime(b.candidate) - getTime(a.candidate))
     .slice(0, maxCount)
