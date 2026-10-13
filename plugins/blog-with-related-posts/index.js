@@ -1,8 +1,8 @@
 // @ts-check
 
 /**
- * Wraps the official blog plugin and adds a `relatedItems` module to every blog post route.
- * The module has the same shape as the `items` module of the blog list, tag and author pages,
+ * Wraps the official blog plugin and adds `relatedItems` to every blog post route's context.
+ * The items have the same shape as the `items` module of the blog list, tag and author pages,
  * so the related posts can be rendered with the shared BlogPostGrid component.
  */
 const blogPluginExports = require('@docusaurus/plugin-content-blog');
@@ -47,7 +47,7 @@ async function blogPluginWithRelatedPosts(context, options) {
             query: { truncated: true },
           },
         }));
-        actions.addRoute({ ...route, modules: { ...route.modules, relatedItems } });
+        actions.addRoute({ ...route, context: { ...route.context, relatedItems } });
       };
 
       await contentLoaded({ ...args, actions: { ...actions, addRoute } });
