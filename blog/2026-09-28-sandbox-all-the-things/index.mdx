@@ -8,7 +8,7 @@ tags: [ai-assisted-development, security, sandboxing, least-privilege]
 image: ./images/cover.png
 ---
 
-
+_Companion blog for deciders: [Vertrauen ist gut, Sandbox ist besser: Warum KI-Coding-Agenten technische Grenzen brauchen](https://bbv.ch/insights/blog/vertrauen-ist-gut-sandbox-ist-besser-warum-ki-coding-agenten-technische-grenzen-brauchen/)_
 
 ## TL;DR
 
@@ -18,15 +18,13 @@ Use least privilege + isolation:
 - really only need a simple sandbox with a Linux guest: docker sbx
 - everything else: vagrant
 
-
-
 ## What to expect
 
 This is not another FOMO article about the shiny new tool that makes you a 100x dev.
 
 It's also not an explainer on how to use %insert-your-favourite-agent-harness-here% effectively or efficiently. There's plenty of that already (some of it even good, or so I am told).
 
-This is about running it *less insecurely* (yes, there is a difference from "more securely"; please don't get me started, I haven't ranted about that topic to anybody for at least 2.8 days).
+This is about running it _less insecurely_ (yes, there is a difference from "more securely"; please don't get me started, I haven't ranted about that topic to anybody for at least 2.8 days).
 
 You need to discover what your way of working actually requires and then do your own threat modelling. You may come to the conclusion that running locally is completely fine. Or you may come to the conclusion that not even air-gapping is good enough.
 
@@ -35,7 +33,6 @@ Basically: we get to (re)discover the principle of least privilege.
 Oh, and another disclaimer: parts of this post might read a bit like a rant. That's because parts of this post are a rant. I get grumpy when (apparently) trillion-dollar companies repeatedly make security-critical mistakes you would expect from a junior in, say, 1995.
 
 {/* truncate */}
-
 
 ## ~~Remote Code Execution Vulnerability~~ Agent-loop
 
@@ -63,7 +60,7 @@ But that means the agent-harness now needs to execute code on our system. Potent
 The model emits "run `grep -rn TODO src/`", the harness runs it on your machine, the output goes back into the context, and the loop turns again.
 `grep` seems rather harmless. But what about `rm`? Or what if you have sensitive data on your machine which should not be the target of a grep, or sensitive data on a share that happens to be mounted?
 
-So the capabilities we actually *want* are:
+So the capabilities we actually _want_ are:
 
 - read from and write to any file anywhere, apart from the ones we don't want it to
 - run any shell command, apart from the ones which are bad
@@ -73,8 +70,6 @@ So the capabilities we actually *want* are:
 And do all of this without asking for permission, because continuously telling it "yes" is tiring and leads to permission fatigue.
 
 Seems about right? Ok, if you can figure that out and come up with a solution, congrats. You probably just solved a hugely difficult problem. To me it feels similar to the undecidability of the halting problem: deciding whether you need to ask or are just allowed is itself already a decision.
-
-
 
 ## Built-in "security" mechanisms
 
@@ -109,15 +104,13 @@ Once you have worked with the agent-harness for a bit and learned how it behaves
 
 Some of those agent-harnesses come with an internal sandbox. Which goes in that direction. But it is either not turned on by default, still in alpha state, or not sandboxing the whole thing (more on that later).
 
-
-
 ## Examples of security risks
 
 The tool-calls that the model requests run as your user, in your shell, with your environment. So if your user has access to sensitive data, the model potentially has access to sensitive data.
 
 Undesirable text can get into the LLM context either by someone maliciously placing it there via prompt injection, or just by a bad answer in a Stack Overflow thread.
 
-A non-exhaustive list, in no particular order (definitely not in the order they happened to me or my colleagues + some bonus ones *hint hint*).
+A non-exhaustive list, in no particular order (definitely not in the order they happened to me or my colleagues + some bonus ones _hint hint_).
 
 ### Work Lost Because of Deletion
 
@@ -183,8 +176,6 @@ Files the agent reads go into the context, and the context is sent to the provid
 `npm install` of whatever package the agent picked. `apt-get install` to fix a build error. `curl https://... | bash` off a docs page it just read.
 Some of the recent npm-related takeovers used post-installation scripts.
 
-
-
 ## Mitigations
 
 Least privilege.
@@ -233,7 +224,7 @@ Quite a good solution. ~~Use the `--clone` option to ensure you don't make ignor
 
 That sentence was true when I wrote it. It is not true anymore.
 
-Clone mode now *additionally* mounts the hosts repository read-only into the sandbox
+Clone mode now _additionally_ mounts the hosts repository read-only into the sandbox
 -> do not use --clone if you have .env files that the agent should not see
 
 See [the appendix](/sandbox-appendix#b-docker-sbx) for the commands on how to get the old guarantee back and more details on the issue.
@@ -309,8 +300,6 @@ An intermediate step, however, could be that you basically mirror your "online w
 In ADO that would mean you create a new project on which the agent-harness has write permissions. In it you fork the original repo. The agent-harness has read permissions on the original project.
 That means it can read tickets, PRs etc., but it can also automatically interact with the forked repo.
 
-
-
 ## Aaargh! This is all so complicated — do I really need all this?
 
 I don't know, but probably yes.
@@ -328,16 +317,14 @@ I hope some of the parts between all the ranting were helpful to you. If you jus
 
 This blog post began when, many moons ago, I started to use claude code more intensively.
 After some discussions with my peers, we came to the conclusion that running it locally was too much of a security risk for us.
-Because there were no built-in sandboxes available yet and docker sbx wasnt out yet either, I just built my own, based on vagrant. 
-This iterated a couple times, and included colleagues using the same solution. The one in [the appendix](/sandbox-appendix). 
+Because there were no built-in sandboxes available yet and docker sbx wasnt out yet either, I just built my own, based on vagrant.
+This iterated a couple times, and included colleagues using the same solution. The one in [the appendix](/sandbox-appendix).
 Then it eventually grew into a full blown course on how to use this tooling for agentic-coding.
 If you want to learn more about the whole agentic-coding topic, give [the course description](https://bbv.ch/academy-detail/53654303/agentic-coding-mit-teilautonomen-cli-agents/) a read.
-
 
 ## Appendix
 
 Both `Vagrantfile`s and the setup instructions are in [the appendix](/sandbox-appendix).
-
 
 ## Attributions
 
