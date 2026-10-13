@@ -7,6 +7,7 @@ export default function ShareButtons(): ReactNode {
   const { siteConfig } = useDocusaurusContext();
   const { metadata } = useBlogPost();
   const [copied, setCopied] = useState(false);
+  const [status, setStatus] = useState<{ message: string; isError: boolean } | null>(null);
   const [canNativeShare, setCanNativeShare] = useState(false);
   const copiedTimeout = useRef<ReturnType<typeof setTimeout>>(undefined);
   const buttonClassName = `${styles.button} share-button`;
@@ -20,21 +21,31 @@ export default function ShareButtons(): ReactNode {
   }, []);
 
   async function handleCopyLink() {
+    clearTimeout(copiedTimeout.current);
+    setCopied(false);
+    setStatus(null);
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
-      clearTimeout(copiedTimeout.current);
+      setStatus({ message: 'Link copied.', isError: false });
       copiedTimeout.current = setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Clipboard API unavailable (e.g. insecure context) - nothing to fall back to.
+      setStatus({
+        message: 'Copy failed. You can copy the link from your browser’s address bar.',
+        isError: true,
+      });
     }
   }
 
   async function handleNativeShare() {
+    setStatus(null);
     try {
       await navigator.share({ title, url });
-    } catch {
-      // User cancelled the share sheet - nothing to do.
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return;
+      }
+      setStatus({ message: 'Sharing failed. You can copy the link instead.', isError: true });
     }
   }
 
@@ -44,19 +55,40 @@ export default function ShareButtons(): ReactNode {
   return (
     <div className={styles.shareButtons} data-pagefind-ignore>
       <button type="button" className={buttonClassName} onClick={handleCopyLink}>
-        {copied ? 'Copied!' : 'Copy link'}
+        <span className={styles.copyLabel}>
+          <span className={copied ? styles.hiddenLabel : undefined} aria-hidden={copied}>
+            Copy link
+          </span>
+          {copied && <span className={styles.copiedLabel}>Copied!</span>}
+        </span>
       </button>
       {canNativeShare && (
         <button type="button" className={buttonClassName} onClick={handleNativeShare}>
           Share…
         </button>
       )}
-      <a className={buttonClassName} href={linkedInHref} target="_blank" rel="noopener noreferrer">
+      <a
+        className={buttonClassName}
+        href={linkedInHref}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Share on LinkedIn (opens in new tab)">
         LinkedIn
       </a>
-      <a className={buttonClassName} href={xHref} target="_blank" rel="noopener noreferrer">
+      <a
+        className={buttonClassName}
+        href={xHref}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Share on X (opens in new tab)">
         X
       </a>
+      <span
+        className={status?.isError ? styles.status : styles.visuallyHidden}
+        role="status"
+        aria-atomic="true">
+        {status?.message}
+      </span>
     </div>
   );
 }
