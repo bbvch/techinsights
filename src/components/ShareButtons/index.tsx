@@ -9,6 +9,7 @@ export default function ShareButtons(): ReactNode {
   const [copied, setCopied] = useState(false);
   const [canNativeShare, setCanNativeShare] = useState(false);
   const copiedTimeout = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const buttonClassName = `${styles.button} share-button`;
 
   const url = `${siteConfig.url}${metadata.permalink}`;
   const { title } = metadata;
@@ -42,18 +43,18 @@ export default function ShareButtons(): ReactNode {
 
   return (
     <div className={styles.shareButtons} data-pagefind-ignore>
-      <button type="button" className={styles.button} onClick={handleCopyLink}>
+      <button type="button" className={buttonClassName} onClick={handleCopyLink}>
         {copied ? 'Copied!' : 'Copy link'}
       </button>
       {canNativeShare && (
-        <button type="button" className={styles.button} onClick={handleNativeShare}>
+        <button type="button" className={buttonClassName} onClick={handleNativeShare}>
           Share…
         </button>
       )}
-      <a className={styles.button} href={linkedInHref} target="_blank" rel="noopener noreferrer">
+      <a className={buttonClassName} href={linkedInHref} target="_blank" rel="noopener noreferrer">
         LinkedIn
       </a>
-      <a className={styles.button} href={xHref} target="_blank" rel="noopener noreferrer">
+      <a className={buttonClassName} href={xHref} target="_blank" rel="noopener noreferrer">
         X
       </a>
     </div>

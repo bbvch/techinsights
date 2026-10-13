@@ -1,6 +1,7 @@
 import React, { type ReactNode } from 'react';
 import clsx from 'clsx';
 import Link from '@docusaurus/Link';
+import Tag from '@theme/Tag';
 import type { Content } from '@theme/BlogPostPage';
 import './styles.css';
 
@@ -77,9 +78,7 @@ export default function BlogPostGrid({
               {tags && tags.length > 0 && (
                 <div className="blog-post-tags">
                   {tags.map((tag) => (
-                    <Link key={tag.permalink} to={tag.permalink} className="blog-post-tag">
-                      {tag.label}
-                    </Link>
+                    <Tag key={tag.permalink} {...tag} />
                   ))}
                 </div>
               )}

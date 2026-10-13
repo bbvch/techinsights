@@ -76,22 +76,7 @@
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-top: auto;
-}
-
-.blog-post-tag {
-  display: inline-block;
-  padding: 0.25rem 0.7rem;
-  background-color: var(--ifm-color-primary);
-  color: #ffffff;
-  border-radius: 0.25rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-  text-decoration: none;
-}
-
-.blog-post-tag:hover {
-  background-color: var(--ifm-color-primary-light);
-  text-decoration: none;
+  font-size: 0.85rem;
 }
 
 .blog-post-authors {
