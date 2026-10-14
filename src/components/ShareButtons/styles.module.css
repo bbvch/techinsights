@@ -1,0 +1,52 @@
+.shareButtons {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--ifm-color-emphasis-300);
+}
+
+.button {
+  border: 1px solid var(--ifm-color-emphasis-300);
+  color: var(--ifm-font-color-base);
+  border-radius: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  line-height: 1.5;
+}
+
+.status {
+  font-size: 0.85rem;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.copyLabel {
+  position: relative;
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.hiddenLabel {
+  visibility: hidden;
+}
+
+.copiedLabel {
+  position: absolute;
+  inset: 0;
+  text-align: center;
+}

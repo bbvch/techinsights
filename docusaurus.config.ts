@@ -1,6 +1,7 @@
 import { themes as prismThemes } from 'prism-react-renderer';
 import type { Config } from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
+import type { Options as BlogOptions } from '@docusaurus/plugin-content-blog';
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
@@ -50,34 +51,39 @@ const config: Config = {
         dataDomains: "techinsights.bbv.ch", // Optional, comma separated list of domains, *Recommended*
       }),
     ],
+    [
+      // Official blog plugin, extended with related posts for each blog post page
+      './plugins/blog-with-related-posts',
+      {
+        authorsMapPath: 'authors.json',
+        routeBasePath: '/', // Serve the blog at the site's root
+        showReadingTime: true,
+        readingTime: ({ content, locale, defaultReadingTime }) =>
+          defaultReadingTime({
+            content,
+            locale,
+            options: { wordsPerMinute: 300 },
+          }),
+        feedOptions: {
+          type: ['rss', 'atom'],
+          xslt: true,
+        },
+        // Useful options to enforce blogging best practices
+        onInlineTags: 'warn',
+        onInlineAuthors: 'warn',
+        onUntruncatedBlogPosts: 'warn',
+        editLocalizedFiles: false,
+        postsPerPage: 9,
+        blogSidebarCount: 0
+      } satisfies BlogOptions,
+    ],
   ],
   presets: [
     [
       'classic',
       {
         docs: false,
-        blog: {
-          authorsMapPath: 'authors.json',
-          routeBasePath: '/', // Serve the blog at the site's root
-          showReadingTime: true,
-          readingTime: ({ content, locale, defaultReadingTime }) =>
-            defaultReadingTime({
-              content,
-              locale,
-              options: { wordsPerMinute: 300 },
-            }),
-          feedOptions: {
-            type: ['rss', 'atom'],
-            xslt: true,
-          },
-          // Useful options to enforce blogging best practices
-          onInlineTags: 'warn',
-          onInlineAuthors: 'warn',
-          onUntruncatedBlogPosts: 'warn',
-          editLocalizedFiles: false,
-          postsPerPage: 9,
-          blogSidebarCount: 0
-        },
+        blog: false, // Provided by ./plugins/blog-with-related-posts
         theme: {
           customCss: './src/css/custom.css',
         },

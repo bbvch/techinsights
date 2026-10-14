@@ -27,6 +27,7 @@ div[role="region"][aria-label="Skip to main content"] {
   --ifm-color-primary-light: #e53935;
   --ifm-color-primary-lighter: #ef5350;
   --ifm-color-primary-lightest: #f44336;
+  --ui-control-accent: var(--ifm-color-primary);
   
   /* Technical font stack */
   --ifm-font-family-base: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
@@ -50,6 +51,7 @@ div[role="region"][aria-label="Skip to main content"] {
   --ifm-color-primary-light: #b98a8a;
   --ifm-color-primary-lighter: #c9a0a0;
   --ifm-color-primary-lightest: #d9b0b0;
+  --ui-control-accent: var(--ifm-color-primary-lighter);
   
   --ifm-background-color: #121212;
   --ifm-background-surface-color: #2a2a2a;
@@ -113,6 +115,35 @@ a:hover {
   color: var(--ifm-color-primary-light);
   text-decoration: underline;
   text-underline-offset: 0.25rem;
+}
+
+/* Button labels and tags never use link underlines. */
+:is(button, .button, [role='button'], .pagination-nav__link, .share-button, a[rel='tag']):is(:hover, :focus-visible) {
+  text-decoration: none;
+}
+
+/* Tags and share actions use the same interaction styles. */
+:is(a[rel='tag'], .share-button) {
+  background-color: transparent;
+  transition: color var(--ifm-transition-fast),
+    border-color var(--ifm-transition-fast),
+    background-color var(--ifm-transition-fast);
+}
+
+a[rel='tag'] {
+  color: var(--ui-control-accent);
+}
+
+:is(a[rel='tag'], .share-button):is(:hover, :focus-visible) {
+  --docusaurus-tag-list-border: var(--ui-control-accent);
+  border-color: var(--ui-control-accent);
+  background-color: color-mix(in srgb, var(--ui-control-accent) 8%, transparent);
+  color: var(--ui-control-accent);
+}
+
+:is(a[rel='tag'], .share-button):focus-visible {
+  outline: 2px solid var(--ui-control-accent);
+  outline-offset: 3px;
 }
 
 /* Navbar styling */
