@@ -1,0 +1,211 @@
+---
+title: "Count the decisions in your spec"
+description: "AI can generate a polished specification in minutes. Deciding what the software should do is still the expensive part. How to keep decisions, open questions, evidence and executable checks connected when agents write most of the artifacts."
+authors: [mobamoh]
+tags: [ai-assisted-development, testing, architecture]
+image: ./images/cover.png
+---
+
+Spec-driven development is a popular answer to a familiar problem: prompt an agent straight into code, and a few days later nobody can explain why the code does what it does. So instead you let the agent write the specification first, usually requirements, a design and a list of tasks, and implement from that. GitHub's Spec Kit, Kiro and BMAD are built around this flow, and most coding agents will follow it without any tool at all.
+
+The idea is sound. The catch is how cheap the specs themselves have become. Any current coding agent can write a product requirements document, an architecture overview and twenty user stories in an afternoon. The result looks professional, with headings and acceptance criteria, sometimes even a glossary. It can still leave every important decision untouched.
+
+Here's the kind of fragment such a run produces:
+
+```markdown
+### FR-12 Discount codes
+Customers can apply a discount code at checkout.
+Each code can be used once. Invalid or expired codes show an error.
+```
+
+Count the decisions in it. "Used once" could mean once per customer or once in total. Nothing says whether a cancelled order gives the redemption back, whether the code stacks with a sale price, or what happens when two checkout requests redeem the same code at the same moment. The fragment sounds settled and settles very little.
+
+{/* truncate */}
+
+Over the last few months I read four recent books on spec-driven development, worked through a course on it, and used what held up while building an Agentic Engineering workshop at bbv. The approaches disagree on a lot, from how much to write up front to how to treat existing code and how much process a small change deserves.
+
+What I took away is simpler than any one method. When I review a specification now, I look for the decisions it makes explicit, the questions it leaves open, and who owns both. AI made artifacts cheap. It didn't make decisions cheap, and it can't take responsibility for them.
+
+## Four things hiding in a spec
+
+Polished documents tend to mix four kinds of information, and I've started pulling them apart whenever I read one.
+
+Evidence is what we can back up. "Every order in the current checkout carries a customer ID" might come from a test, a database constraint, production data or a code path we traced, and where it came from matters.
+
+Questions are what the material doesn't answer. "Does cancelling the order restore the discount code?" is worth as much as any answer in the document, as long as it stays visible. It marks the exact spot where somebody still has to decide.
+
+Decisions are outcomes that somebody with the authority to choose has actually chosen. "A code can be redeemed once per customer" belongs here if the business owner agreed to it.
+
+Context is whatever helps us understand the other three: domain terms, architecture, constraints, history, the reasons a boundary exists.
+
+Agents are very good at context and decent at collecting evidence. They're also quick to propose answers to questions, and that's where it gets risky. A proposal can turn into a decision without anyone noticing, because a generated sentence looks exactly as polished as one that records a real decision.
+
+The books I read come at this from different directions and still land in the same place. Auren Teklor's legacy-code method is strict about separating facts, assumptions, inferences and decisions. Simon Martinelli offers a practical readiness test: "If an AI tool must invent missing rules to generate code, it is not executable yet." I don't need every change to produce the same set of documents. I do need to know when implementation is about to depend on something nobody has decided.
+
+## Start by finding the missing decisions
+
+So before I let an agent write the specification, I want to find the questions that would keep it from being trustworthy.
+
+[Example Mapping](https://cucumber.io/blog/bdd/example-mapping-introduction/) is good at exactly this. Rules, concrete examples and open questions sit next to each other, and concrete examples make vague wording uncomfortable fast. For the discount-code story, I'd ask an agent for something like:
+
+```text
+From this story, list the business rules it actually states,
+two or three concrete examples for each rule, and the
+questions the story does not answer.
+
+Do not answer an open question unless the source material
+already contains the decision.
+```
+
+A good result looks like this:
+
+```text
+Rule      A code can be used once.
+
+Example   Ada redeems SPRING10 for the first time -> discount applied
+Example   Ada redeems SPRING10 again              -> rejected
+Example   Bob redeems SPRING10 after Ada          -> ?
+
+Question  Does "once" mean once in total or once per customer?
+Question  Does a cancelled order restore the redemption?
+Question  Can a discount code be combined with a sale price?
+Question  What must happen if two redemption requests arrive concurrently?
+```
+
+The third example is where the vague wording breaks: as soon as somebody has to write down what happens to Bob, "once" needs a meaning. I keep those questions in plain sight until somebody answers them. They show where authority is still missing.
+
+Not every question goes to the product owner, though. Suppose product decides that the limit is once per customer. That decision already implies that two concurrent attempts by the same customer can't both succeed. How to guarantee that is an engineering decision. A unique constraint in the database is one option, and a different storage model might need another. The cancelled-order question stays with product, because it changes what the customer is entitled to.
+
+Business decisions and technical decisions have different owners. The agent can propose either kind. It shouldn't appoint itself as the owner without anyone noticing.
+
+## Turn important decisions into checks
+
+Once a rule is agreed, I want a way to check it that doesn't rely on the implementation explaining why it's correct. For behaviour that's often an acceptance test. An API may need a contract test, and an architecture boundary an ArchUnit rule or another static check. With "once per customer" decided, the second example from the map becomes this test:
+
+```java
+@Test
+@DisplayName("R1-E2: the same customer cannot redeem a code twice")
+void sameCustomerCannotRedeemTwice() {
+    checkout.redeem("SPRING10", ada);
+
+    assertThatThrownBy(() -> checkout.redeem("SPRING10", ada))
+        .isInstanceOf(CodeAlreadyRedeemed.class);
+}
+```
+
+Writing the test first doesn't make it correct. Somebody still has to review the rule, the example and the expected result. What test-first does give you is something outside the implementation for the change to satisfy. When the code comes first and the test is generated from it, the test tends to describe whatever the code happened to do. Gem Iroko puts the risk plainly: "When you write tests after code, you may accidentally test what the code already does."
+
+Tests have limits too. They cover the examples somebody thought of, and they can be weakened, skipped or generated from the same wrong assumption as the production code. So when an agent hands back a change, I look at the tests before I spend much time on the production diff:
+
+```bash
+git status --short -- src/test
+git diff HEAD -- src/test
+```
+
+The first command also lists new files, which no diff shows; the second includes changes the agent already staged.
+
+Another example can expose an implementation that only special-cased the first one. Its expected result has to come from an agreed rule, though. Inventing one to "improve coverage" just moves the missing decision into a test.
+
+For behaviour that will live a while, I keep a small decision record next to the checks:
+
+```text
+D-14  A code is redeemable once per customer, not once globally.
+      owner: product
+      checks: R1-E1..E3
+
+T-07  Enforce redemption uniqueness at the persistence boundary.
+      owner: engineering
+      reversible: yes
+
+Q-03  Does cancelling an order restore the redemption?
+      owner: product
+      status: open
+```
+
+D marks a product decision, T a technical one, and Q an open question. `R1-E1..E3` points to the tests for rule 1, examples 1 to 3.
+
+It's deliberately boring. A developer reading it a year later can see what was decided, who owned it, what's still open and where the executable evidence lives.
+
+## Write prose when prose has a job
+
+Documents still have their place, as long as each one does a job that code and tests do badly.
+
+A product or architecture document earns its place when several people need to agree before implementation starts. That's where a structured approach like BMAD helps. Its full upstream flow is substantial, and the method also offers QuickSpec and Quick Dev paths for smaller work, because running the full process on every change would be disproportionate.
+
+A durable behavioural spec earns its place when a rule outlives the current ticket and has to be understood without reading test code. Who may refund which transaction, or how discount types combine, can matter for years. A short, versioned use case is easier to review than a rule reconstructed from several tests.
+
+An architecture decision record earns its place when the reason matters. A test can prove that the domain doesn't depend on the web layer. It can't explain why the team chose that boundary, which alternatives were rejected, or when the decision should be revisited.
+
+So I create a separate artifact when it has a clear reader, a reason to outlive the current change, and an owner who'll notice when it goes stale. The owner matters more than ever now that generated documentation is almost free. AI made documents cheap to create. Reviewing and maintaining them costs what it always did.
+
+## Put repeatable rules in the build
+
+Instruction files like `CLAUDE.md` or `AGENTS.md` are the right home for build commands, conventions and architecture guidance that should survive a single conversation. They're still instructions. Teklor has a section titled "Instructions Are Not Enforcement", and I'd happily hang that title on a team wall.
+
+If a rule matters and a machine can check it, I'd rather make the build responsible. If the domain has to stay framework-free, an architecture test can reject the dependency. If an API contract has to stay compatible, a contract check does more than another sentence asking the agent to be careful. Smart's course takes the same route: the instructions describe the intended architecture, ArchUnit turns some of those boundaries into executable checks, and hooks run verification around the agent's edits.
+
+Checks cost time to build and maintain. My rough rule is to automate the constraints that matter and are easy to break by accident, especially the ones I've already explained in several reviews. I'd rather teach the build once than keep teaching every new developer and every new agent session. Rules that need judgment stay in prose and review.
+
+## In existing code, evidence comes before authority
+
+Legacy code makes all of this harder, because the implementation looks like a set of decisions when much of it is history.
+
+Suppose the checkout prevents repeat redemptions by email address. A customer with two accounts can then use the same code twice. Whether that's a defect, a campaign rule somebody wanted, or an old shortcut nobody revisited, the code can't say. Ask an agent to "document the discount rules" and the email check may come back as a clean requirement, because it's the strongest evidence the agent found. Now a piece of history has a heading and looks intentional.
+
+I keep the provenance attached:
+
+```text
+Evidence
+- CheckoutService checks prior redemption by email address.
+- Database has no uniqueness constraint for customer identity + code.
+- Support ticket #418 reports the same code used from two accounts.
+
+Question
+- Is redemption meant to be limited by account, person, email,
+  or something else?
+
+Decision
+- unresolved
+```
+
+A characterization test can pin down today's behaviour so a refactoring doesn't change it by accident. It doesn't approve the behaviour. That still takes a decision.
+
+How much of a legacy system the agent should read first is a real trade-off. BMAD offers an exhaustive documentation mode for large, unfamiliar codebases. Teklor warns that supplying everything at once costs you control over which source deserves authority. Both have a point. If the goal is a reliable map of a system nobody understands anymore, broad reconnaissance can be worth the cost. For a focused change to one rule, I start narrow: trace that rule through callers, tests, configuration, data constraints and operational evidence, and widen only when the evidence pushes me outward.
+
+## Spend process where a wrong guess would hurt
+
+I don't want spec-driven development to turn into one mandatory artifact pipeline.
+
+A prototype we'll throw away can tolerate plenty of agent improvisation. A small defect in a component the team knows well may need one regression test and a normal review. A pricing or permission change used across several channels deserves explicit examples, owners and traceability. A legacy migration with contradictory behaviour may spend more time on evidence than on code. Rigor should follow risk: uncertainty, blast radius, reversibility, how long the behaviour will live, and how many people need the same understanding of it.
+
+Once a decision is clear and its check is trustworthy, I want the agent to move fast. Search broadly, generate the boilerplate, make the change, run the build, suggest edge cases. That's the work AI makes cheaper.
+
+An agent is excellent at transforming a decision into other artifacts, turning a rule into tests or an architecture constraint into a static check. It can propose missing decisions too. What it shouldn't do unseen is turn missing intent into an authoritative rule. Better models may make that rarer, but they don't decide who has the authority to set a rule. That boundary belongs in the workflow.
+
+## What I use now
+
+The result for me is smaller than a new methodology. Before a significant change moves from discussion into implementation, I want reasonable answers to four questions:
+
+```text
+What do we know?
+What have we decided?
+What is still open?
+What will prove the decision holds?
+```
+
+For a tiny change, the answers fit in a ticket and a test. A long-lived business capability may justify proper use cases, stable identifiers and decision records. In brownfield work, answering the first question can take longer than the implementation.
+
+At bbv we practise this in an Agentic Engineering workshop with Claude Code: Example Mapping for discovery, one agreed rule turned into an acceptance test, small TDD steps, and a review against the behaviour we actually decided.
+
+None of these practices is new. Example Mapping, acceptance tests, use cases, characterization tests, architecture rules and decision records all predate coding agents. What changed is how fast an unresolved assumption can turn into a complete-looking feature whose code, tests and documentation all agree with each other.
+
+So next time an agent hands you a spec, take five minutes before you review the code. Mark every sentence that decides something, and write next to it who decided it. The marks without a name are your real backlog: questions nobody has asked yet, dressed up as requirements.
+
+## References that shaped this view
+
+- Simon Martinelli, [*Spec-Driven Development: From Specs to Code with AI Agents*](https://doi.org/10.1007/979-8-8688-2851-5)
+- Marlon Vidal Ferreira, [*Spec-Driven Development with BMAD*](https://a.co/d/0dlhWzrT)
+- Gem Iroko, [*Spec-Driven AI Engineering*](https://amzn.eu/d/0065yjZC)
+- Auren Teklor, [*Spec-Driven Development for Legacy Code*](https://a.co/d/0hC1gClZ)
+- John Ferguson Smart, [*Spec-Driven Development in Java with TDD and Claude Code*](https://www.udemy.com/course/spring-boot-ai-tdd/)
+- Matt Wynne, [*Introducing Example Mapping*](https://cucumber.io/blog/bdd/example-mapping-introduction/)

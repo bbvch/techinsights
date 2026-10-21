@@ -86,5 +86,18 @@
       "linkedin": "sebastian-hans-0006a6421",
       "mastodon": "https://hachyderm.io/@sebhans"
     }
+  },
+  "mobamoh": {
+    "name": "Mohamed Bamoh",
+    "title": "Senior Technical Consultant & Solution Architect",
+    "description": "Mohamed Bamoh is a Senior Technical Consultant and Solution Architect at bbv Software Services GmbH with 14+ years of experience across software engineering, architecture, and consulting. His background ranges from enterprise SAP Commerce and Java/Spring platforms to cloud-native Go systems on Kubernetes. He focuses on pragmatic software architecture, Domain-Driven Design, API-first engineering, and modern development approaches such as agentic and spec-driven software engineering.",
+    "url": "/authors/mobamoh",
+    "imageURL": "/img/authors/MohamedBamoh.jpg",
+    "page": true,
+    "image": "",
+    "socials": {
+      "github": "mobamoh",
+      "linkedin": "mohamedbamoh"
+    }
   }
 }
