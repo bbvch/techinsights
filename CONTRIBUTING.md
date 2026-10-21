@@ -39,12 +39,14 @@ Thank you for contributing! This blog is a simple, engineer-driven space for tec
    3. Assign it to yourself
    4. Create a branch (e.g., `blog/my-post-slug`) for your blog post.
    5. Create a [blog post folder structure](#blog-post-folder-structure).
+   6. If you add new tags to `blog/tags.yml`, assign them to a reviewer persona in [`.github/blog-review/personas.yml`](.github/blog-review/personas.yml) (see [AI review](#ai-review)).
 4. Ready to review?
    1. Put it "in review"
    2. Create a Pull Request and link to issue with #{issue-number}
-   3. Request feedback from somebody
-   4. Update based on feedback where helpful
-   5. Request from [@bbv-blogger-admin team](https://github.com/orgs/bbvch/teams/bbv-blog-admin) approval in Pull Request
+   3. An [AI review](#ai-review) is posted automatically as a PR comment
+   4. Request feedback from somebody
+   5. Update based on feedback where helpful
+   6. Request from [@bbv-blogger-admin team](https://github.com/orgs/bbvch/teams/bbv-blog-admin) approval in Pull Request
 5. Ready to publish?
    1. When approved, wait for the blog administrator to set a publishing date.
    2. When the publishing date is set, change the blog path and the frontmatter accordingly.
@@ -104,6 +106,15 @@ image: ./images/cover.png # relative path to the cover image for this post, used
 
 - Use the author keys defined in `blog/authors.yml` for the `authors` frontmatter.
 - Use tags defined in `blog/tags.yml` for `tags` frontmatter.
+
+### AI review
+
+Pull requests from `blog/*` branches get an automated AI review ([workflow](.github/workflows/blog-ai-review.yml)) when they are opened or marked ready for review (not for drafts).
+
+- Reviewer personas (e.g. Cloud Architect, DevOps Engineer) are selected based on the post's tags; a Technical Editor always reviews. The mapping lives in [`.github/blog-review/personas.yml`](.github/blog-review/personas.yml) — extend it when adding new tags.
+- The feedback is posted (and updated) as a single PR comment in English. Scores are additional feedback only and do not block the PR.
+- To run the review again after changes, add the label `ai-review` to the PR.
+- Maintainers configure the secret `OPENAI_API_KEY` and optionally the variables `OPENAI_MODEL`, `OPENAI_BASE_URL` and `BLOG_REVIEW_MAX_PERSONAS` in the repository settings.
 
 ## Analytics and access
 
