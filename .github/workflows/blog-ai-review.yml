@@ -4,7 +4,8 @@ name: Blog AI review
 # Scores are feedback only; this workflow does not gate the pull request.
 #
 # Configuration (Settings > Secrets and variables > Actions):
-#   secrets.OPENAI_API_KEY          required  OpenAI API key
+#   secrets.OPENAI_API_KEY          required  OpenAI API key (unless test mode is enabled)
+#   vars.BLOG_REVIEW_TEST_MODE      optional  1 = fixed test comment without LLM calls (default: 0)
 #   vars.OPENAI_MODEL               optional  model name (default: gpt-4.1)
 #   vars.OPENAI_BASE_URL            optional  API base URL (default: https://api.openai.com/v1)
 #   vars.BLOG_REVIEW_MAX_PERSONAS   optional  max. tag-based personas per post (default: 3)
@@ -54,6 +55,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BLOG_REVIEW_TEST_MODE: ${{ vars.BLOG_REVIEW_TEST_MODE || '0' }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           OPENAI_BASE_URL: ${{ vars.OPENAI_BASE_URL }}

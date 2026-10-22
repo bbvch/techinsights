@@ -114,6 +114,15 @@ async function upsertComment(repo, prNumber, body) {
   return github('POST', `/repos/${repo}/issues/${prNumber}/comments`, { body });
 }
 
+async function publishComment(repo, event, body) {
+  if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, body);
+  await upsertComment(repo, event.pull_request.number, body);
+
+  if (event.action === 'labeled' && event.label?.name === REVIEW_LABEL) {
+    await github('DELETE', `/repos/${repo}/issues/${event.pull_request.number}/labels/${REVIEW_LABEL}`);
+  }
+}
+
 async function reviewPost(file, personas, guidelines, tagsYml, personaPrompt, summaryPrompt) {
   const post = parsePost(read(file));
   const selected = selectPersonas(personas, post.tags, MAX_PERSONAS);
@@ -175,6 +184,17 @@ async function main() {
   const baseSha = env.BASE_SHA || pr?.base?.sha;
   if (!pr || !repo || !baseSha) throw new Error('This script must run in a pull_request workflow.');
 
+  if (env.BLOG_REVIEW_TEST_MODE === '1') {
+    console.log('Test mode enabled. Publishing a fixed comment without LLM calls.');
+    await publishComment(repo, event, [
+      COMMENT_MARKER,
+      '## Blog AI review — test mode',
+      '',
+      'This is a hard-coded test comment. No LLM was called.',
+    ].join('\n'));
+    return;
+  }
+
   if (!OPENAI_API_KEY) {
     console.log('::warning::OPENAI_API_KEY is not available (e.g. PR from a fork). Skipping AI review.');
     return;
@@ -205,12 +225,7 @@ async function main() {
     results.map((r) => r.feedback),
     { model: OPENAI_MODEL, sha: pr.head?.sha },
   );
-  if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, body);
-  await upsertComment(repo, pr.number, body);
-
-  if (event.action === 'labeled' && event.label?.name === REVIEW_LABEL) {
-    await github('DELETE', `/repos/${repo}/issues/${pr.number}/labels/${REVIEW_LABEL}`);
-  }
+  await publishComment(repo, event, body);
 
   if (results.every((r) => r.failed)) {
     throw new Error('All AI reviews failed. See warnings above.');
