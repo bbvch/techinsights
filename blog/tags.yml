@@ -84,10 +84,6 @@ least-privilege:
   label: Least Privilege
   permalink: /least-privilege
 
-linux:
-  label: Linux
-  permalink: /linux
-
 pit-of-success:
   label: Pit of Success
   permalink: /pit-of-success
