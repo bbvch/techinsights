@@ -109,12 +109,30 @@ image: ./images/cover.png # relative path to the cover image for this post, used
 
 ### AI review
 
-Pull requests from `blog/*` branches get an automated AI review ([workflow](.github/workflows/blog-ai-review.yml)) when they are opened or marked ready for review (not for drafts).
+The [Blog AI review workflow](.github/workflows/blog-ai-review.yml) reviews new or changed `.md` and `.mdx` posts under `blog/` in pull requests from branches starting with `blog/` to `main`.
 
-- Reviewer personas (e.g. Cloud Architect, DevOps Engineer) are selected based on the post's tags; a Technical Editor always reviews. The mapping lives in [`.github/blog-review/personas.yml`](.github/blog-review/personas.yml) — extend it when adding new tags.
-- The feedback is posted (and updated) as a single PR comment in English. Scores are additional feedback only and do not block the PR.
-- To run the review again after changes, add the label `ai-review` to the PR.
-- Maintainers configure the secret `OPENAI_API_KEY` and optionally the variables `OPENAI_MODEL`, `OPENAI_BASE_URL` and `BLOG_REVIEW_MAX_PERSONAS` in the repository settings.
+#### Triggers and feedback
+
+- The review runs when a PR is opened or marked ready for review. Draft PRs are skipped.
+- New commits alone do not trigger another review. After changes, add the `ai-review` label to the PR. Create this label in the repository if it does not exist. It is removed automatically after the review comment is published, so it can be added again for the next review.
+- There is no manual **Run workflow** trigger. Check runs and logs under **Actions → Blog AI review**.
+- Reviewer personas (e.g. Cloud Architect, DevOps Engineer) are ranked by the number of matching post tags. By default, up to three matching personas review each post. If none match, a Senior Software Engineer reviews instead. A Technical Editor always reviews in addition.
+- The persona mapping and review focus live in [`.github/blog-review/personas.yml`](.github/blog-review/personas.yml); extend the mapping when adding new tags. Review instructions live in [the persona prompt](.github/blog-review/prompts/persona.md) and [the summary prompt](.github/blog-review/prompts/summary.md).
+- Feedback is posted in English as a single PR comment, which is updated on subsequent runs. It includes scores from 0 to 10, strengths, gaps, suggestions, and a summary of the main issues. Unknown tags are flagged. Scores are additional feedback only and do not determine whether the PR can be merged.
+
+#### Repository configuration
+
+Maintainers configure the following under **Settings → Secrets and variables → Actions**. Add the API key on the **Secrets** tab and the other settings on the **Variables** tab as repository variables.
+
+| Setting | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `OPENAI_API_KEY` | Secret | None | Required for real AI reviews; not needed in test mode. |
+| `BLOG_REVIEW_TEST_MODE` | Variable | `0` | Set to exactly `1` to publish a fixed test comment without LLM calls. |
+| `OPENAI_MODEL` | Variable | `gpt-4.1` | Model used for reviews and the summary. |
+| `OPENAI_BASE_URL` | Variable | `https://api.openai.com/v1` | API base URL for a compatible Chat Completions endpoint with structured JSON output. |
+| `BLOG_REVIEW_MAX_PERSONAS` | Variable | `3` | Maximum number of matching tag-based personas per post; the Technical Editor is additional. |
+
+GitHub supplies `GITHUB_TOKEN` automatically. The workflow requests `contents: read` and `pull-requests: write` permissions to read the repository and publish comments. Test PRs should come from a branch in this repository: fork PRs normally have a read-only token that cannot publish comments. Outside test mode, the review is skipped with a warning if `OPENAI_API_KEY` is unavailable (for example, on fork PRs).
 
 ## Analytics and access
 
