@@ -34,7 +34,7 @@ Evidence is what we can back up. "Every order in the current checkout carries a 
 
 Questions are what the material doesn't answer. "Does cancelling the order restore the discount code?" is worth as much as any answer in the document, as long as it stays visible. It marks the exact spot where somebody still has to decide.
 
-Decisions are outcomes that somebody with the authority to choose has actually chosen. "A code can be redeemed once per customer" belongs here if the business owner agreed to it.
+Decisions are outcomes that somebody with the authority to choose has actually chosen. "A discount code can be redeemed once per customer" belongs here if the business owner agreed to it.
 
 Context is whatever helps us understand the other three: domain terms, architecture, constraints, history, the reasons a boundary exists.
 
@@ -60,7 +60,7 @@ already contains the decision.
 A good result looks like this:
 
 ```text
-Rule      A code can be used once.
+Rule      A discount code can be used once.
 
 Example   Ada redeems SPRING10 for the first time -> discount applied
 Example   Ada redeems SPRING10 again              -> rejected
@@ -84,7 +84,7 @@ Once a rule is agreed, I want a way to check it that doesn't rely on the impleme
 
 ```java
 @Test
-@DisplayName("R1-E2: the same customer cannot redeem a code twice")
+@DisplayName("R1-E2: the same customer cannot redeem a discount code twice")
 void sameCustomerCannotRedeemTwice() {
     checkout.redeem("SPRING10", ada);
 
@@ -109,7 +109,7 @@ Another example can expose an implementation that only special-cased the first o
 For behaviour that will live a while, I keep a small decision record next to the checks:
 
 ```text
-D-14  A code is redeemable once per customer, not once globally.
+D-14  A discount code is redeemable once per customer, not once globally.
       owner: product
       checks: R1-E1..E3
 
@@ -150,15 +150,15 @@ Checks cost time to build and maintain. My rough rule is to automate the constra
 
 Legacy code makes all of this harder, because the implementation looks like a set of decisions when much of it is history.
 
-Suppose the checkout prevents repeat redemptions by email address. A customer with two accounts can then use the same code twice. Whether that's a defect, a campaign rule somebody wanted, or an old shortcut nobody revisited, the code can't say. Ask an agent to "document the discount rules" and the email check may come back as a clean requirement, because it's the strongest evidence the agent found. Now a piece of history has a heading and looks intentional.
+Suppose the checkout prevents repeat redemptions by email address. A customer with two accounts can then use the same discount code twice. Whether that's a defect, a campaign rule somebody wanted, or an old shortcut nobody revisited, the implementation can't say. Ask an agent to "document the discount rules" and the email check may come back as a clean requirement, because it's the strongest evidence the agent found. Now a piece of history has a heading and looks intentional.
 
 I keep the provenance attached:
 
 ```text
 Evidence
 - CheckoutService checks prior redemption by email address.
-- Database has no uniqueness constraint for customer identity + code.
-- Support ticket #418 reports the same code used from two accounts.
+- Database has no uniqueness constraint for customer identity + discount code.
+- Support ticket #418 reports the same discount code used from two accounts.
 
 Question
 - Is redemption meant to be limited by account, person, email,
