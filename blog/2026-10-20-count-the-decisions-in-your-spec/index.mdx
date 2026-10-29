@@ -74,7 +74,7 @@ Question  What must happen if two redemption requests arrive concurrently?
 
 The third example is where the vague wording breaks: as soon as somebody has to write down what happens to Bob, "once" needs a meaning. I keep those questions in plain sight until somebody answers them. They show where authority is still missing.
 
-Not every question goes to the product owner, though. Suppose product decides that the limit is once per customer. That decision already implies that two concurrent attempts by the same customer can't both succeed. How to guarantee that is an engineering decision. A unique constraint in the database is one option, and a different storage model might need another. The cancelled-order question stays with product, because it changes what the customer is entitled to.
+Not every question goes to the product owner, though. Suppose the product owner decides that the limit is once per customer. That decision already implies that two concurrent attempts by the same customer can't both succeed. How to guarantee that is an engineering decision. A unique constraint in the database is one option, and a different storage model might need another. The cancelled-order question stays with the product owner, because it changes what the customer is entitled to.
 
 Business decisions and technical decisions have different owners. The agent can propose either kind. It shouldn't appoint itself as the owner without anyone noticing.
 
@@ -148,7 +148,7 @@ Checks cost time to build and maintain. My rough rule is to automate the constra
 
 ## In existing code, evidence comes before authority
 
-Legacy code makes all of this harder, because the implementation looks like a set of decisions when much of it is history.
+Legacy code makes all of this harder. The implementation looks like a set of decisions, even though much of it is just history.
 
 Suppose the checkout prevents repeat redemptions by email address. A customer with two accounts can then use the same discount code twice. Whether that's a defect, a campaign rule somebody wanted, or an old shortcut nobody revisited, the implementation can't say. Ask an agent to "document the discount rules" and the email check may come back as a clean requirement, because it's the strongest evidence the agent found. Now a piece of history has a heading and looks intentional.
 
