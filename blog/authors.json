@@ -86,5 +86,18 @@
       "linkedin": "sebastian-hans-0006a6421",
       "mastodon": "https://hachyderm.io/@sebhans"
     }
+  },
+  "markusburri": {
+    "name": "Markus Burri",
+    "title": "Senior Software Engineer & Architect",
+    "description": "Markus Burri is an embedded software engineer and software architect at bbv Software Services GmbH. For many years, Markus has been working close to the hardware: Linux kernel, device drivers and bootloaders. Bringing up new boards, reading datasheets and getting peripherals to talk to the system is where Markus feels most at home. Security is a topic close to Markus's heart, from the boot chain up to the running system.",
+    "url": "/authors/markusburri",
+    "imageURL": "/img/authors/MarkusBurri.jpg",
+    "page": true,
+    "image": "",
+    "socials": {
+      "github": "markusburri",
+      "linkedin": "markus-burri-12260a228"
+    }
   }
 }
