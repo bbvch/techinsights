@@ -1,4 +1,4 @@
-/* BlogListPage component styles (moved from src/css/custom.css) */
+/* Blog post card grid, shared by the blog list page and the author pages */
 
 .blog-list-container {
   display: grid;
@@ -19,10 +19,11 @@
 
 .blog-post-card:hover {
   border-color: var(--ifm-color-primary-light);
-  box-shadow: 0 4px 12px rgba(0, 217, 255, 0.1);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--ifm-color-primary) 15%, transparent);
 }
 
 .blog-post-image {
+  display: block;
   width: 100%;
   height: 180px;
   overflow: hidden;
@@ -43,7 +44,8 @@
   flex: 1;
 }
 
-.blog-post-content h2 {
+.blog-post-content h2,
+.blog-post-content h3 {
   margin: 0 0 0.5rem 0;
   font-size: 1.1rem;
   line-height: 1.3;
@@ -74,22 +76,7 @@
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-top: auto;
-}
-
-.blog-post-tag {
-  display: inline-block;
-  padding: 0.25rem 0.7rem;
-  background-color: var(--ifm-color-primary);
-  color: #ffffff;
-  border-radius: 0.25rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-  text-decoration: none;
-}
-
-.blog-post-tag:hover {
-  background-color: var(--ifm-color-primary-light);
-  text-decoration: none;
+  font-size: 0.85rem;
 }
 
 .blog-post-authors {
@@ -107,6 +94,21 @@
 
 @media (min-width: 769px) and (max-width: 1200px) {
   .blog-list-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Fewer than three posts: stretch the cards over the full width */
+.blog-list-container.blog-list-container--single {
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 769px) {
+  .blog-list-container--single .blog-post-image {
+    height: 300px;
+  }
+
+  .blog-list-container.blog-list-container--pair {
     grid-template-columns: repeat(2, 1fr);
   }
 }

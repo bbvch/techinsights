@@ -4,7 +4,7 @@ A simple, engineer-driven technical blog (Docusaurus) for sharing posts, tutoria
 
 ## Requirements
 
-Install Node.js version 24.0 or above (which can be checked by running node -v). You can use nvm to manage multiple Node.js versions on a single machine.
+Install Node.js version 20.0 or above (which can be checked by running node -v). You can use nvm to manage multiple Node.js versions on a single machine.
 When installing Node.js, it is recommended to check all checkboxes related to dependencies.
 See for more details [docusaurus requirements](https://docusaurus.io/docs/installation#requirements)
 
@@ -13,6 +13,12 @@ See for more details [docusaurus requirements](https://docusaurus.io/docs/instal
 - Install dependencies: `pnpm install`
 - Run locally: `pnpm start`
 - Build: `pnpm run build`
+- Test: `pnpm test`
+
+## Search
+
+- Index pages locally: npm run build
+- Then start the app: npm run serve
 
 ## Contributing
 
@@ -22,6 +28,7 @@ Please read the contribution guidelines: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 - `blog/` — blog posts and assets (each post in a dated folder)
 - `src/` — React components and theme overrides
+- `plugins/` — local Docusaurus plugins (e.g. the blog plugin extended with related articles)
 - `static/` — public assets
 
 If you need help, open an issue or tag a maintainer in your PR.

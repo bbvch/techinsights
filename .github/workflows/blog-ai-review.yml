@@ -1,0 +1,62 @@
+name: Blog AI review
+
+# AI review of new/changed blog posts from the perspective of tag-based personas.
+# Scores are feedback only; this workflow does not gate the pull request.
+#
+# Configuration (Settings > Secrets and variables > Actions):
+#   secrets.OPENAI_API_KEY          required  OpenAI API key (unless test mode is enabled)
+#   vars.BLOG_REVIEW_TEST_MODE      optional  1 = fixed test comment without LLM calls (default: 0)
+#   vars.OPENAI_MODEL               optional  model name (default: gpt-4.1)
+#   vars.OPENAI_BASE_URL            optional  API base URL (default: https://api.openai.com/v1)
+#   vars.BLOG_REVIEW_MAX_PERSONAS   optional  max. tag-based personas per post (default: 3)
+#
+# Re-run the review by adding the label "ai-review" to the pull request.
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, ready_for_review, labeled]
+    paths:
+      - 'blog/**/*.md'
+      - 'blog/**/*.mdx'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    name: AI review
+    if: >-
+      startsWith(github.head_ref, 'blog/') &&
+      !github.event.pull_request.draft &&
+      (github.event.action != 'labeled' || github.event.label.name == 'ai-review')
+    # Job-level so that skipped runs (e.g. other labels) don't cancel a running review.
+    concurrency:
+      group: blog-ai-review-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Review blog posts
+        run: node .github/blog-review/review.mjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BLOG_REVIEW_TEST_MODE: ${{ vars.BLOG_REVIEW_TEST_MODE || '0' }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          OPENAI_BASE_URL: ${{ vars.OPENAI_BASE_URL }}
+          BLOG_REVIEW_MAX_PERSONAS: ${{ vars.BLOG_REVIEW_MAX_PERSONAS }}

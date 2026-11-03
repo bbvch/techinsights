@@ -22,6 +22,8 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: npm install --frozen-lockfile
+      - name: Run tests
+        run: npm test
       - name: Build website
         run: pnpm run build
 

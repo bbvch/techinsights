@@ -5,14 +5,15 @@
   "scripts": {
     "docusaurus": "docusaurus",
     "start": "docusaurus start",
-    "build": "docusaurus build",
+    "build": "docusaurus build && pagefind --site build",
     "swizzle": "docusaurus swizzle",
     "deploy": "docusaurus deploy",
     "clear": "docusaurus clear",
     "serve": "docusaurus serve",
     "write-translations": "docusaurus write-translations",
     "write-heading-ids": "docusaurus write-heading-ids",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "test": "node --test \"plugins/**/*.test.js\" \".github/blog-review/*.test.mjs\""
   },
   "dependencies": {
     "@dipakparmar/docusaurus-plugin-umami": "3.0.0",
@@ -33,7 +34,9 @@
     "@docusaurus/module-type-aliases": "3.10.2",
     "@docusaurus/tsconfig": "3.10.2",
     "@docusaurus/types": "3.10.2",
-    "typescript": "5.6.2"
+    "js-yaml": "^4.1.0",
+    "pagefind": "^1.5.2",
+    "typescript": "5.9.2"
   },
   "browserslist": {
     "production": [
@@ -48,7 +51,7 @@
     ]
   },
   "engines": {
-    "node": ">=20.0"
+    "node": ">=22"
   },
   "packageManager": "pnpm@11.17.0+sha512.cca3cea332ad254bb84145f966d19f4879615210346fc92c79a047f23a0d7b3cca3c3792f0076ba1f1831d277efbcf0a9119b31a9a60eca7fb3d6231f331ef72"
 }
