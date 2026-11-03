@@ -120,6 +120,7 @@ const config: Config = {
       copyright: `Copyright © ${new Date().getFullYear()} bbv Software Services AG`,
       links: [
         { label: 'bbv.ch', href: 'https://bbv.ch' },
+        { label: 'AI Hub', href: 'https://ai-hub.bbv.ch/' },
         { label: 'bbv GitHub', href: 'https://github.com/bbvch' },
         { label: 'bbv LinkedIn', href: 'https://www.linkedin.com/company/bbv-software-services' },
       ],

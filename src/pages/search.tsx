@@ -92,7 +92,7 @@ export default function SearchPage(): React.JSX.Element {
           runSearch(pendingQueryRef.current);
         }
       } catch {
-        setError('Search index not available. Run npm run build to generate it.');
+        setError('Search index not available. Run pnpm run build to generate it.');
       }
     }
 
@@ -116,7 +116,7 @@ export default function SearchPage(): React.JSX.Element {
           {isDev ? (
             <p className={styles.notice}>
               Search is only available in production builds. Run{' '}
-              <code>npm run build && npm run serve</code> to test it locally.
+              <code>pnpm run build && pnpm run serve</code> to test it locally.
             </p>
           ) : error ? (
             <p className={styles.notice}>{error}</p>
